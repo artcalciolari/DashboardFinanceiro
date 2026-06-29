@@ -1,20 +1,20 @@
 # DashboardFinanceiro
 
-Dashboard financeiro pessoal criado para organizar a minha rotina de acompanhamento de receitas, despesas, categorias, recorrencias, parcelamentos, alertas e exportacao de dados.
+Dashboard financeiro pessoal criado para organizar a minha rotina de acompanhamento de receitas, despesas, categorias, recorrências, parcelamentos, alertas e exportação de dados.
 
-Este projeto tem foco em portfolio e uso pessoal. A proposta e demonstrar uma aplicacao full stack funcional, com interface limpa, API REST, conteinerizacao e uma experiencia pratica para consulta e manutencao dos meus proprios dados financeiros.
+Este projeto tem foco em portfólio e uso pessoal. A proposta é demonstrar uma aplicação full stack funcional, com interface limpa, API REST, conteinerização e uma experiência prática para consulta e manutenção dos meus próprios dados financeiros.
 
 ## Destaques
 
-- Visao mensal com saldo, entradas, saidas e evolucao do periodo.
-- Graficos para acompanhar variacao mensal e distribuicao por categoria.
-- Cadastro de categorias com cores, icones e limites de alerta.
-- Registro de despesas, receitas, recorrencias e parcelamentos.
-- Alertas configuraveis para acompanhar limites definidos.
-- Exportacao de informacoes financeiras em CSV e PDF.
-- Interface responsiva em React, com componentes reutilizaveis e estados de carregamento.
-- API em Node.js com TypeScript, validacao de entrada e rotas organizadas por dominio.
-- Ambiente containerizado para execucao local consistente.
+- Visão mensal com saldo, entradas, saídas e evolução do período.
+- Gráficos para acompanhar variação mensal e distribuição por categoria.
+- Cadastro de categorias com cores, ícones e limites de alerta.
+- Registro de despesas, receitas, recorrências e parcelamentos.
+- Alertas configuráveis para acompanhar limites definidos.
+- Exportação de informações financeiras em CSV e PDF.
+- Interface responsiva em React, com componentes reutilizáveis e estados de carregamento.
+- API em Node.js com TypeScript, validação de entrada e rotas organizadas por domínio.
+- Ambiente conteinerizado para execução local consistente.
 
 ## Stack
 
@@ -31,12 +31,12 @@ git clone https://github.com/artcalciolari/DashboardFinanceiro.git
 cd DashboardFinanceiro
 
 cp .env.example .env
-# Edite o .env com valores locais antes de subir os servicos.
+# Edite o .env com valores locais antes de subir os serviços.
 
 docker compose up -d
 ```
 
-Aplicacao: http://localhost:3000  
+Aplicação: http://localhost:3000
 API: http://localhost:3001
 
 ### Desenvolvimento Local
@@ -57,7 +57,7 @@ npm install
 npm run dev
 ```
 
-Frontend em desenvolvimento: http://localhost:5173
+Frontend disponível em desenvolvimento: http://localhost:5173
 
 ## Estrutura
 
@@ -81,9 +81,3 @@ DashboardFinanceiro/
       types/
       utils/
 ```
-
-## Observacoes
-
-- O arquivo `.env` e local e nao deve ser versionado.
-- Use `.env.example` apenas como referencia de variaveis necessarias.
-- Os dados e configuracoes usados em desenvolvimento devem ser tratados como informacoes privadas.
