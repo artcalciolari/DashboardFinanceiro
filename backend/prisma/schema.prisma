@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id          String      @id @default(cuid())
+  name        String
+  type        AccountType
+  balance     Float       @default(0)
+  color       String      @default("#3B82F6")
+  creditLimit Float?      // Para cartão: limite total disponível/informativo
+  closingDay  Int?        // Para cartão: dia de fechamento da fatura
+  dueDay      Int?        // Para cartão: dia de vencimento da fatura
+
+  transactions      Transaction[]
+  installmentGroups InstallmentGroup[]
+  subscriptions     Subscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum AccountType {
+  BANK_ACCOUNT
+  CREDIT_CARD
+  CASH
+  INVESTMENT
+}
+
+model Category {
+  id    String       @id @default(cuid())
+  name  String
+  type  CategoryType
+  color String       @default("#10B981")
+  icon  String?
+
+  transactions      Transaction[]
+  alerts            Alert[]
+  installmentGroups InstallmentGroup[]
+  subscriptions     Subscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  description String
+  amount      Float
+  type        TransactionType
+  date        DateTime        // Data real da compra
+  effectiveDate DateTime      // Data efetiva (ajustada pelo fechamento do cartão)
+
+  accountId  String
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  installmentGroupId String?
+  installmentGroup   InstallmentGroup? @relation(fields: [installmentGroupId], references: [id], onDelete: SetNull)
+  installmentNumber  Int?
+  totalInstallments  Int?
+  subscriptionId      String?
+  subscription        Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  subscriptionYear    Int?
+  subscriptionMonth   Int?
+
+  isThirdParty  Boolean @default(false)
+  thirdPartyName String?
+  isReimbursed  Boolean @default(false)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+model InstallmentGroup {
+  id               String   @id @default(cuid())
+  description      String
+  totalAmount      Float
+  installmentCount Int
+  startDate        DateTime
+  isThirdParty     Boolean  @default(false)
+  thirdPartyName   String?
+  isReimbursed     Boolean  @default(false)
+
+  accountId  String
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Subscription {
+  id             String   @id @default(cuid())
+  name           String
+  amount         Float
+  startDate      DateTime
+  endDate        DateTime?
+  billingDay     Int
+  isActive       Boolean  @default(true)
+  isThirdParty   Boolean  @default(false)
+  thirdPartyName String?
+  isReimbursed   Boolean  @default(false)
+  notes          String?
+
+  accountId  String
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  transactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Alert {
+  id          String      @id @default(cuid())
+  name        String
+  categoryId  String
+  category    Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  limitAmount Float
+  period      AlertPeriod
+  isActive    Boolean     @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum AlertPeriod {
+  MONTHLY
+  WEEKLY
+}
