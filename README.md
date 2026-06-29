@@ -27,7 +27,7 @@ Este projeto tem foco em portfolio e uso pessoal. A proposta e demonstrar uma ap
 ### Com Docker
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/artcalciolari/DashboardFinanceiro.git
 cd DashboardFinanceiro
 
 cp .env.example .env
