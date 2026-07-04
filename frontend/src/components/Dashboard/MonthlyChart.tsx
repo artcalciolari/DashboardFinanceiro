@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  BarChart,
+  ComposedChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -18,38 +19,64 @@ export default function MonthlyChart() {
     queryFn: summaryApi.getEvolution,
   });
 
+  const sorted = data
+    .slice()
+    .sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month));
+
+  let cumulative = 0;
+  const chartData = sorted.map((m) => {
+    cumulative += m.income - m.expenses;
+    return { ...m, cumulative };
+  });
+
   return (
     <div className="card">
-      <h3 className="text-base font-semibold text-gray-800 mb-4">Evolução Mensal</h3>
+      <div className="mb-1 flex items-start justify-between">
+        <div>
+          <h3 className="font-display text-base font-semibold text-ink">Fluxo & saldo acumulado</h3>
+          <p className="mt-0.5 text-[12.5px] text-faint">Últimos 6 meses</p>
+        </div>
+      </div>
       {isLoading ? (
-        <div className="h-64 flex items-center justify-center text-gray-400">Carregando...</div>
+        <div className="flex h-64 items-center justify-center text-faint">Carregando...</div>
       ) : (
-        <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+        <ResponsiveContainer width="100%" height={270}>
+          <ComposedChart data={chartData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 4" stroke="#F2F0E8" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 12, fill: '#6b7280' }}
-              axisLine={false}
+              tick={{ fontSize: 12, fill: '#8A978F', fontFamily: 'Instrument Sans' }}
+              axisLine={{ stroke: '#E6E3DA' }}
               tickLine={false}
             />
-            <YAxis
-              tick={{ fontSize: 11, fill: '#6b7280' }}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={(v: number) =>
-                v >= 1000 ? `R$${(v / 1000).toFixed(1)}k` : `R$${v}`
-              }
-            />
+            <YAxis yAxisId="bars" hide />
+            <YAxis yAxisId="line" orientation="right" hide />
             <Tooltip
               formatter={(value: number) => formatCurrency(value)}
-              labelStyle={{ fontWeight: 600 }}
-              contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb' }}
+              labelStyle={{ fontWeight: 600, color: '#12241D' }}
+              contentStyle={{ borderRadius: 12, border: '1px solid #E6E3DA', fontSize: 13 }}
             />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="income" name="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="expenses" name="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
-          </BarChart>
+            <Legend
+              verticalAlign="top"
+              align="right"
+              height={28}
+              wrapperStyle={{ fontSize: 12, color: '#5B6B63' }}
+              iconType="square"
+              iconSize={9}
+            />
+            <Bar yAxisId="bars" dataKey="income" name="Receitas" fill="#7FC59E" radius={[4, 4, 0, 0]} barSize={18} />
+            <Bar yAxisId="bars" dataKey="expenses" name="Despesas" fill="#E0A594" radius={[4, 4, 0, 0]} barSize={18} />
+            <Line
+              yAxisId="line"
+              type="monotone"
+              dataKey="cumulative"
+              name="Acumulado"
+              stroke="#0C3B2E"
+              strokeWidth={2.5}
+              dot={{ r: 4, fill: '#fff', stroke: '#0C3B2E', strokeWidth: 2.5 }}
+              activeDot={{ r: 5 }}
+            />
+          </ComposedChart>
         </ResponsiveContainer>
       )}
     </div>

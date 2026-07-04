@@ -11,27 +11,29 @@ export default function Dashboard() {
   const { month, year } = useDate();
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-0.5 capitalize">
-          Visão geral de {formatMonthYear(month, year)}
+    <div>
+      <div className="mb-[22px]">
+        <h1 className="font-display text-[26px] font-bold tracking-tight text-ink">Olá! 👋</h1>
+        <p className="mt-1 text-[14.5px] text-muted">
+          Aqui está o resumo de <span className="capitalize">{formatMonthYear(month, year)}</span>.
         </p>
       </div>
 
-      <SummaryCards />
+      <div className="mb-4">
+        <SummaryCards />
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[1.55fr_1fr]">
         <MonthlyChart />
         <CategoryChart />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AccountSummaryWidget />
-        <AlertsWidget />
+        <ActiveInstallmentsWidget />
       </div>
 
-      <ActiveInstallmentsWidget />
+      <AlertsWidget />
     </div>
   );
 }

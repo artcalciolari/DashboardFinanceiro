@@ -4,6 +4,16 @@ import { useDate } from '../../context/DateContext';
 import { formatCurrency, ACCOUNT_TYPE_LABELS } from '../../utils/formatters';
 import { clsx } from 'clsx';
 
+function initials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+}
+
 export default function AccountSummaryWidget() {
   const { month, year } = useDate();
 
@@ -16,36 +26,38 @@ export default function AccountSummaryWidget() {
 
   return (
     <div className="card">
-      <h3 className="text-base font-semibold text-gray-800 mb-3">Resumo por Conta</h3>
+      <div className="mb-4 flex items-start justify-between">
+        <div>
+          <h3 className="font-display text-base font-semibold text-ink">Suas contas</h3>
+          <p className="mt-0.5 text-[12.5px] text-faint">Movimentação líquida do mês</p>
+        </div>
+      </div>
       {isLoading ? (
-        <div className="py-8 text-center text-sm text-gray-400">Carregando...</div>
+        <div className="py-8 text-center text-sm text-faint">Carregando...</div>
       ) : withMovement.length === 0 ? (
-        <div className="py-8 text-center text-sm text-gray-400">Nenhuma movimentação por conta neste mês</div>
+        <div className="py-8 text-center text-sm text-faint">Nenhuma movimentação por conta neste mês</div>
       ) : (
-        <div className="space-y-3">
+        <div className="flex flex-col gap-3">
           {withMovement.map(({ account, income, expenses, invoiceExpenses, receivableAmount, net }) => (
             <div key={account.id} className="flex items-center gap-3">
               <div
-                className="w-3 h-3 rounded-full flex-shrink-0"
-                style={{ backgroundColor: account.color }}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-800 truncate">{account.name}</span>
-                  <span
-                    className={clsx(
-                      'text-sm font-semibold',
-                      net >= 0 ? 'text-emerald-600' : 'text-red-600'
-                    )}
-                  >
-                    {formatCurrency(net)}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-400">
-                  {ACCOUNT_TYPE_LABELS[account.type]} · +{formatCurrency(income)} / pessoal -{formatCurrency(expenses)}
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] font-display text-xs font-bold"
+                style={{ backgroundColor: `${account.color}20`, color: account.color }}
+              >
+                {initials(account.name)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13.5px] font-semibold text-ink">{account.name}</div>
+                <p className="truncate text-xs text-faint">
+                  {ACCOUNT_TYPE_LABELS[account.type]} · +{formatCurrency(income)} / -{formatCurrency(expenses)}
                   {invoiceExpenses > expenses && ` · fatura ${formatCurrency(invoiceExpenses)}`}
                   {receivableAmount > 0 && ` · a receber ${formatCurrency(receivableAmount)}`}
                 </p>
+              </div>
+              <div
+                className={clsx('tabular flex-shrink-0 text-sm font-semibold', net >= 0 ? 'text-income' : 'text-expense')}
+              >
+                {formatCurrency(net)}
               </div>
             </div>
           ))}

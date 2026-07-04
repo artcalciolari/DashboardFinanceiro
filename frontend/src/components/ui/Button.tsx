@@ -19,13 +19,13 @@ export default function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  const base = 'inline-flex items-center justify-center gap-2 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+  const base = 'inline-flex items-center justify-center gap-2 font-semibold rounded-control transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
 
   const variants = {
-    primary: 'bg-blue-600 hover:bg-blue-700 text-white',
-    secondary: 'bg-gray-100 hover:bg-gray-200 text-gray-700',
-    danger: 'bg-red-50 hover:bg-red-100 text-red-600',
-    ghost: 'hover:bg-gray-100 text-gray-600',
+    primary: 'bg-forest hover:bg-forest-hover text-white',
+    secondary: 'bg-white hover:bg-chip text-ink border border-border',
+    danger: 'bg-expense/10 hover:bg-expense/20 text-expense',
+    ghost: 'hover:bg-chip text-muted',
   };
 
   const sizes = {

@@ -1,11 +1,14 @@
-import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Search, Plus } from 'lucide-react';
 import { useDate } from '../../context/DateContext';
+import { useSearch } from '../../context/SearchContext';
+import { useTransactionModal } from '../../context/TransactionModalContext';
 import { formatMonthYear } from '../../utils/formatters';
 import { exportApi } from '../../services/api';
-import Button from '../ui/Button';
 
 export default function Header() {
   const { month, year, setMonth, setYear } = useDate();
+  const { search, setSearch } = useSearch();
+  const { openCreate } = useTransactionModal();
   const today = new Date();
   const currentMonth = today.getMonth() + 1;
   const currentYear = today.getFullYear();
@@ -39,40 +42,69 @@ export default function Header() {
   }
 
   return (
-    <header className="bg-white border-b border-gray-100 px-4 md:px-6 py-3 flex items-center justify-between sticky top-0 z-20">
-      {/* Month selector */}
-      <div className="flex items-center gap-2">
+    <header className="sticky top-0 z-30 flex items-center gap-4 border-b border-border bg-[rgba(244,242,236,0.85)] px-5 py-3.5 backdrop-blur-md md:px-8">
+      <div className="flex items-center gap-1.5 rounded-control border border-border bg-white p-1">
         <button
           type="button"
           onClick={prevMonth}
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+          className="flex h-[30px] w-[30px] items-center justify-center rounded-lg text-muted transition-colors hover:bg-chip"
           aria-label="Mês anterior"
         >
-          <ChevronLeft size={18} />
+          <ChevronLeft size={16} />
         </button>
-        <span className="text-sm font-semibold text-gray-800 min-w-[160px] text-center capitalize">
+        <span className="min-w-[132px] text-center text-[13.5px] font-semibold capitalize text-ink">
           {formatMonthYear(month, year)}
         </span>
         <button
           type="button"
           onClick={nextMonth}
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+          className="flex h-[30px] w-[30px] items-center justify-center rounded-lg text-muted transition-colors hover:bg-chip"
           aria-label="Próximo mês"
         >
-          <ChevronRight size={18} />
+          <ChevronRight size={16} />
         </button>
-        {!isCurrentMonth && (
-          <Button variant="ghost" size="sm" onClick={goToCurrentMonth} className="hidden sm:inline-flex">
-            Hoje
-          </Button>
-        )}
       </div>
 
-      {/* Actions */}
-      <Button variant="secondary" size="sm" onClick={handleExportCSV}>
-        <Download size={14} />
-        <span className="hidden sm:inline">Exportar CSV</span>
-      </Button>
+      {!isCurrentMonth && (
+        <button
+          type="button"
+          onClick={goToCurrentMonth}
+          className="hidden h-[38px] flex-shrink-0 items-center rounded-control border border-border bg-white px-3.5 text-[13px] font-semibold text-forest transition-colors hover:bg-chip sm:inline-flex"
+        >
+          Hoje
+        </button>
+      )}
+
+      <div className="flex-1" />
+
+      <div className="relative hidden w-[280px] max-w-[34vw] md:block">
+        <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+        <input
+          type="text"
+          placeholder="Buscar transações…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="h-10 w-full rounded-control border border-border bg-white pl-9 pr-3 text-[13.5px] text-ink outline-none transition-shadow focus:border-forest focus:shadow-focus-forest"
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={handleExportCSV}
+        className="flex h-10 flex-shrink-0 items-center gap-1.5 rounded-control border border-border bg-white px-3.5 text-[13.5px] font-semibold text-ink transition-colors hover:bg-chip"
+      >
+        <Download size={16} />
+        <span className="hidden sm:inline">Exportar</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={openCreate}
+        className="flex h-10 flex-shrink-0 items-center gap-1.5 rounded-control bg-forest px-4 text-[13.5px] font-semibold text-white transition-colors hover:bg-forest-hover"
+      >
+        <Plus size={17} />
+        <span className="hidden sm:inline">Nova transação</span>
+      </button>
     </header>
   );
 }

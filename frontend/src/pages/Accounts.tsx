@@ -128,72 +128,74 @@ export default function Accounts() {
   const creditCards = accounts.filter((account) => account.type === 'CREDIT_CARD');
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div>
+      <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Contas e Cartões</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {accounts.length} conta(s) · {creditCards.length} cartão(ões) · Saldo base {formatCurrency(cashBalance)}
+          <h1 className="font-display text-[24px] font-bold tracking-tight text-ink">Contas & cartões</h1>
+          <p className="mt-1 text-sm text-muted">
+            {accounts.length} conta(s) · {creditCards.length} cartão(ões) · Saldo base{' '}
+            <b className="text-ink">{formatCurrency(cashBalance)}</b>
           </p>
         </div>
         <Button onClick={openCreate} size="sm">
           <Plus size={16} />
-          Nova Conta
+          Nova conta
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="card text-center text-gray-400 py-8">Carregando...</div>
+        <div className="card py-8 text-center text-faint">Carregando...</div>
       ) : accounts.length === 0 ? (
-        <div className="card text-center py-8">
-          <p className="text-gray-400 text-sm mb-3">Nenhuma conta cadastrada</p>
+        <div className="card py-8 text-center">
+          <p className="mb-3 text-sm text-faint">Nenhuma conta cadastrada</p>
           <Button variant="secondary" size="sm" onClick={openCreate}>Adicionar conta</Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {accounts.map((account) => {
             const Icon = ACCOUNT_ICONS[account.type];
+            const positive = account.type !== 'CREDIT_CARD';
             return (
-              <div key={account.id} className="card border border-gray-100">
+              <div key={account.id} className="card">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div
-                      className="p-2.5 rounded-xl"
+                      className="flex h-11 w-11 items-center justify-center rounded-xl"
                       style={{ backgroundColor: account.color + '20' }}
                     >
                       <Icon size={20} style={{ color: account.color }} />
                     </div>
                     <div>
-                      <p className="font-semibold text-gray-800">{account.name}</p>
-                      <p className="text-xs text-gray-500">{ACCOUNT_TYPE_LABELS[account.type]}</p>
+                      <p className="text-[15px] font-semibold text-ink">{account.name}</p>
+                      <p className="text-[12.5px] text-faint">{ACCOUNT_TYPE_LABELS[account.type]}</p>
                     </div>
                   </div>
                   <div className="flex gap-1">
                     <button
                       onClick={() => openEdit(account)}
-                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      className="rounded-lg p-1.5 text-faint transition-colors hover:bg-chip hover:text-forest"
                       title="Editar conta"
                     >
                       <Pencil size={14} />
                     </button>
                     <button
                       onClick={() => setDeleteTarget(account)}
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="rounded-lg p-1.5 text-faint transition-colors hover:bg-expense/10 hover:text-expense"
                       title="Excluir conta"
                     >
                       <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
-                <div className="mt-4 pt-3 border-t border-gray-50">
+                <div className="mt-[18px]">
                   {account.type === 'CREDIT_CARD' ? (
                     <>
-                      <p className="text-xs text-gray-500">Limite total</p>
-                      <p className="text-lg font-bold text-gray-800">
+                      <p className="text-[12.5px] text-faint">Limite total</p>
+                      <p className="tabular mt-0.5 font-display text-[26px] font-bold tracking-tight text-ink">
                         {account.creditLimit ? formatCurrency(account.creditLimit) : 'Não informado'}
                       </p>
                       {(account.closingDay || account.dueDay) && (
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="mt-1 text-xs text-faint">
                           {account.closingDay && `Fecha dia ${account.closingDay}`}
                           {account.closingDay && account.dueDay && ' · '}
                           {account.dueDay && `Vence dia ${account.dueDay}`}
@@ -202,8 +204,15 @@ export default function Accounts() {
                     </>
                   ) : (
                     <>
-                      <p className="text-xs text-gray-500">Saldo inicial</p>
-                      <p className="text-lg font-bold text-gray-800">{formatCurrency(account.balance)}</p>
+                      <p className="text-[12.5px] text-faint">
+                        {account.type === 'INVESTMENT' ? 'Total investido' : 'Saldo inicial'}
+                      </p>
+                      <p
+                        className="tabular mt-0.5 font-display text-[26px] font-bold tracking-tight"
+                        style={{ color: positive ? '#0F7A52' : undefined }}
+                      >
+                        {formatCurrency(account.balance)}
+                      </p>
                     </>
                   )}
                 </div>
@@ -214,7 +223,7 @@ export default function Accounts() {
       )}
 
       {/* Modal */}
-      <Modal isOpen={isModalOpen} onClose={closeModal} title={editing ? 'Editar Conta' : 'Nova Conta'}>
+      <Modal isOpen={isModalOpen} onClose={closeModal} title={editing ? 'Editar conta' : 'Nova conta'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Nome da conta"
@@ -223,7 +232,7 @@ export default function Accounts() {
             placeholder="Ex: Nubank, Bradesco, Dinheiro..."
             required
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Select
               label="Tipo"
               value={form.type}

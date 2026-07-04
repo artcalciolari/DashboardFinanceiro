@@ -9,7 +9,6 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
-import { clsx } from 'clsx';
 
 interface FormState {
   name: string;
@@ -127,111 +126,124 @@ export default function Alerts() {
   const attentionCount = alertStatuses.filter((status) => status.isTriggered || status.isWarning).length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div>
+      <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Alertas de Gastos</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="font-display text-[24px] font-bold tracking-tight text-ink">Alertas</h1>
+          <p className="mt-1 text-sm text-muted">
             {alerts.length} alerta(s) · {attentionCount} exigindo atenção
           </p>
         </div>
         <Button onClick={openCreate} size="sm">
           <Plus size={16} />
-          Novo Alerta
+          Novo alerta
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="card text-center py-8 text-gray-400">Carregando...</div>
+        <div className="card py-8 text-center text-faint">Carregando...</div>
       ) : alerts.length === 0 ? (
-        <div className="card text-center py-8">
-          <Bell size={32} className="text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-400 mb-3">Nenhum alerta configurado</p>
+        <div className="card py-8 text-center">
+          <Bell size={32} className="mx-auto mb-2 text-faint" />
+          <p className="mb-3 text-sm text-faint">Nenhum alerta configurado</p>
           <Button variant="secondary" size="sm" onClick={openCreate}>Criar alerta</Button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="flex max-w-[720px] flex-col gap-3">
           {sortedAlerts.map((alert) => {
             const status = statusMap[alert.id];
             const pct = status ? Math.min(status.percentage, 100) : 0;
+            const accent = !alert.isActive
+              ? '#8A978F'
+              : status?.isTriggered
+                ? '#C0523B'
+                : status?.isWarning
+                  ? '#B07A1E'
+                  : '#0C3B2E';
+            const iconBg = !alert.isActive
+              ? '#F0EEE6'
+              : status?.isTriggered
+                ? '#FBEBE6'
+                : status?.isWarning
+                  ? '#FEF3C7'
+                  : '#E9F0EC';
 
             return (
-              <div key={alert.id} className={clsx('card border', status?.isTriggered ? 'border-red-200' : status?.isWarning ? 'border-amber-200' : 'border-gray-100')}>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={clsx('p-2 rounded-lg', !alert.isActive ? 'bg-gray-100' : status?.isTriggered ? 'bg-red-50' : status?.isWarning ? 'bg-amber-50' : 'bg-blue-50')}>
-                      {alert.isActive ? (
-                        <Bell size={18} className={clsx(status?.isTriggered ? 'text-red-500' : status?.isWarning ? 'text-amber-500' : 'text-blue-500')} />
-                      ) : (
-                        <BellOff size={18} className="text-gray-400" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-800">{alert.name}</p>
-                      <p className="text-xs text-gray-500 flex flex-wrap items-center gap-1.5">
-                        <span style={{ color: alert.category.color }}>{alert.category.name}</span>
-                        <span>·</span>
-                        <span>{alert.period === 'MONTHLY' ? 'Mensal' : 'Semanal'}</span>
-                        {!alert.isActive && (
-                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-500">
-                            Inativo
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => updateMutation.mutate({ id: alert.id, data: { isActive: !alert.isActive } })}
-                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      title={alert.isActive ? 'Desativar' : 'Ativar'}
-                    >
-                      {alert.isActive ? <Bell size={14} /> : <BellOff size={14} />}
-                    </button>
-                    <button
-                      onClick={() => openEdit(alert)}
-                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="Editar alerta"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      onClick={() => setDeleteTarget(alert)}
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Excluir alerta"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+              <div
+                key={alert.id}
+                className="flex items-start gap-3.5 rounded-2xl border border-border bg-card py-[18px] pl-5 pr-5"
+                style={{ borderLeft: `3px solid ${accent}` }}
+              >
+                <div
+                  className="flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[11px]"
+                  style={{ backgroundColor: iconBg, color: accent }}
+                >
+                  {alert.isActive ? <Bell size={18} /> : <BellOff size={18} />}
                 </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-ink">{alert.name}</p>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-faint">
+                    <span style={{ color: alert.category.color }}>{alert.category.name}</span>
+                    <span>·</span>
+                    <span>{alert.period === 'MONTHLY' ? 'Mensal' : 'Semanal'}</span>
+                    {!alert.isActive && (
+                      <span className="rounded-pill bg-chip px-2 py-0.5 text-[10px] font-semibold text-muted">
+                        Inativo
+                      </span>
+                    )}
+                  </p>
 
-                {alert.isActive && status && (
-                  <div className="mt-4">
-                    <div className="flex justify-between text-xs text-gray-500 mb-1.5">
-                      <span>
-                        {formatCurrency(status.currentAmount)} de {formatCurrency(alert.limitAmount)}
-                        {status.isTriggered && ' · ⚠ Limite ultrapassado!'}
-                        {status.isWarning && !status.isTriggered && ' · ⚡ Quase no limite'}
-                      </span>
-                      <span className={clsx('font-semibold', status.isTriggered ? 'text-red-500' : status.isWarning ? 'text-amber-500' : 'text-gray-600')}>
-                        {Math.round(status.percentage)}%
-                      </span>
+                  {alert.isActive && status && (
+                    <div className="mt-3">
+                      <div className="mb-1.5 flex justify-between text-xs text-muted">
+                        <span>
+                          {formatCurrency(status.currentAmount)} de {formatCurrency(alert.limitAmount)}
+                          {status.isTriggered && ' · limite ultrapassado'}
+                          {status.isWarning && !status.isTriggered && ' · quase no limite'}
+                        </span>
+                        <span className="font-semibold" style={{ color: accent }}>
+                          {Math.round(status.percentage)}%
+                        </span>
+                      </div>
+                      <div className="h-[7px] overflow-hidden rounded-pill bg-chip">
+                        <div
+                          className="h-full rounded-pill transition-all"
+                          style={{ width: `${pct}%`, backgroundColor: accent }}
+                        />
+                      </div>
                     </div>
-                    <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className={clsx('h-full rounded-full transition-all', status.isTriggered ? 'bg-red-500' : status.isWarning ? 'bg-amber-400' : 'bg-blue-500')}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
+                <div className="flex flex-shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => updateMutation.mutate({ id: alert.id, data: { isActive: !alert.isActive } })}
+                    className="rounded-lg p-1.5 text-faint transition-colors hover:bg-chip hover:text-forest"
+                    title={alert.isActive ? 'Desativar' : 'Ativar'}
+                  >
+                    {alert.isActive ? <Bell size={14} /> : <BellOff size={14} />}
+                  </button>
+                  <button
+                    onClick={() => openEdit(alert)}
+                    className="rounded-lg p-1.5 text-faint transition-colors hover:bg-chip hover:text-forest"
+                    title="Editar alerta"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget(alert)}
+                    className="rounded-lg p-1.5 text-faint transition-colors hover:bg-expense/10 hover:text-expense"
+                    title="Excluir alerta"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             );
           })}
         </div>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={closeModal} title={editing ? 'Editar Alerta' : 'Novo Alerta'} size="sm">
+      <Modal isOpen={isModalOpen} onClose={closeModal} title={editing ? 'Editar alerta' : 'Novo alerta'} size="sm">
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Nome do alerta"
@@ -272,7 +284,7 @@ export default function Alerts() {
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={closeModal}>Cancelar</Button>
             <Button type="submit" className="flex-1" loading={createMutation.isPending || updateMutation.isPending}>
-              {editing ? 'Salvar' : 'Criar Alerta'}
+              {editing ? 'Salvar' : 'Criar alerta'}
             </Button>
           </div>
         </form>
