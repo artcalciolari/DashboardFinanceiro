@@ -25,7 +25,7 @@ export default function ConfirmDialog({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">{description}</p>
+        <p className="text-sm text-muted">{description}</p>
         <div className="flex gap-2 pt-1">
           <Button
             type="button"
@@ -39,7 +39,7 @@ export default function ConfirmDialog({
           <Button
             type="button"
             variant="danger"
-            className="flex-1 bg-red-600 text-white hover:bg-red-700"
+            className="flex-1 bg-expense text-white hover:bg-expense/90"
             loading={loading}
             onClick={onConfirm}
           >

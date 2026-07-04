@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Calendar, Pencil } from 'lucide-react';
 import { installmentsApi, accountsApi, categoriesApi } from '../services/api';
-import { formatCurrency, formatDate, formatMonthYear } from '../utils/formatters';
+import { formatCurrency, formatDate } from '../utils/formatters';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -140,6 +140,8 @@ export default function Installments() {
       return lastB - lastA || a.group.description.localeCompare(b.group.description);
     });
 
+  const committedMonthly = ongoingInstallments.reduce((sum, view) => sum + view.installmentAmount, 0);
+
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['installments'] });
     qc.invalidateQueries({ queryKey: ['transactions'] });
@@ -242,49 +244,43 @@ export default function Installments() {
     return (
       <div key={group.id} className="card">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              className="p-2 rounded-lg"
-              style={{ backgroundColor: group.category.color + '20' }}
-            >
-              <Calendar size={18} style={{ color: group.category.color }} />
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-display text-base font-semibold text-ink">{group.description}</p>
+              {group.isThirdParty && (
+                <span className="rounded-pill bg-amber/10 px-2 py-0.5 text-[10px] font-semibold text-amber">
+                  Terceiro{group.thirdPartyName ? `: ${group.thirdPartyName}` : ''}
+                </span>
+              )}
+              {group.isThirdParty && group.isReimbursed && (
+                <span className="rounded-pill bg-income/10 px-2 py-0.5 text-[10px] font-semibold text-income">
+                  Reembolsado
+                </span>
+              )}
             </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-semibold text-gray-800">{group.description}</p>
-                {isFinished && (
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
-                    Finalizado
-                  </span>
-                )}
-                {group.isThirdParty && (
-                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                    Terceiro{group.thirdPartyName ? `: ${group.thirdPartyName}` : ''}
-                  </span>
-                )}
-                {group.isThirdParty && group.isReimbursed && (
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                    Reembolsado
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-gray-500">
-                {group.account.name} ·{' '}
-                <span style={{ color: group.category.color }}>{group.category.name}</span>
-              </p>
-            </div>
+            <p className="mt-0.5 text-[12.5px] text-faint">
+              {group.account.name} · <span style={{ color: group.category.color }}>{group.category.name}</span>
+            </p>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-shrink-0 items-center gap-1">
+            <span
+              className={clsx(
+                'rounded-pill px-2.5 py-1 text-[11.5px] font-semibold',
+                isFinished ? 'bg-income/10 text-income' : 'bg-[#E9F0EC] text-forest'
+              )}
+            >
+              {isFinished ? 'Quitado' : 'Ativo'}
+            </span>
             <button
               onClick={() => openPaymentDateModal(group)}
-              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              className="rounded-lg p-1.5 text-faint transition-colors hover:bg-chip hover:text-forest"
               title="Alterar data de pagamento"
             >
               <Pencil size={14} />
             </button>
             <button
               onClick={() => setDeleteTarget(group)}
-              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="rounded-lg p-1.5 text-faint transition-colors hover:bg-expense/10 hover:text-expense"
               title="Remover parcelamento"
             >
               <Trash2 size={14} />
@@ -292,85 +288,69 @@ export default function Installments() {
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-          <div>
-            <p className="text-xs text-gray-500">Total</p>
-            <p className="text-sm font-bold text-gray-800">{formatCurrency(group.totalAmount)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">Por parcela</p>
-            <p className="text-sm font-bold text-gray-800">{formatCurrency(installmentAmount)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">Progresso</p>
-            <p className="text-sm font-bold text-gray-800">{paid}/{total} parcelas</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500">{isFinished ? 'Última' : 'Próxima'}</p>
-            <p className="text-sm font-bold text-gray-800">
-              {isFinished
-                ? last
-                  ? formatDate(last.effectiveDate)
-                  : 'Finalizado'
-                : next
-                  ? formatDate(next.effectiveDate)
-                  : 'Sem parcelas futuras'}
-            </p>
-          </div>
+        <div className="mb-1 mt-[18px] flex items-baseline gap-1.5">
+          <span className="tabular font-display text-2xl font-bold text-ink">{formatCurrency(installmentAmount)}</span>
+          <span className="text-[13px] text-faint">/mês</span>
         </div>
-
-        <div className="mt-3">
-          <div className="flex justify-between text-xs text-gray-500 mb-1">
-            <span>Progresso de pagamento</span>
-            <span>{pct}%</span>
-          </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className={clsx('h-full rounded-full transition-all', pct === 100 ? 'bg-emerald-500' : 'bg-blue-500')}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
+        <div className="mb-3.5 text-[12.5px] text-faint">
+          Total {formatCurrency(group.totalAmount)} ·{' '}
+          {isFinished
+            ? last
+              ? `finalizado em ${formatDate(last.effectiveDate)}`
+              : 'finalizado'
+            : `restam ${formatCurrency(installmentAmount * (total - paid))}`}
+        </div>
+        <div className="mb-2 h-2 overflow-hidden rounded-pill bg-chip">
+          <div
+            className={clsx('h-full rounded-pill transition-all', isFinished ? 'bg-income' : 'bg-forest')}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[12.5px] font-medium text-muted">
+            Parcela {paid} de {total}
+            {!isFinished && next && ` · próxima ${formatDate(next.effectiveDate)}`}
+          </span>
+          <span className="text-[12.5px] font-semibold text-muted">{pct}%</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div>
+      <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Parcelamentos</h1>
-          <p className="text-sm text-gray-500 mt-0.5 capitalize">
-            {ongoingInstallments.length} em andamento · {finishedInstallments.length} finalizado(s) · referência {formatMonthYear(month, year)}
+          <h1 className="font-display text-[24px] font-bold tracking-tight text-ink">Parcelamentos</h1>
+          <p className="mt-1 text-sm capitalize text-muted">
+            {ongoingInstallments.length} ativo(s) · {formatCurrency(committedMonthly)} por mês comprometidos
           </p>
         </div>
         <Button onClick={() => setIsModalOpen(true)} size="sm">
           <Plus size={16} />
-          Novo Parcelamento
+          Novo parcelamento
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="card text-center py-8 text-gray-400">Carregando...</div>
+        <div className="card py-8 text-center text-faint">Carregando...</div>
       ) : groups.length === 0 ? (
-        <div className="card text-center py-8">
-          <Calendar size={32} className="text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-400 mb-3">Nenhum parcelamento cadastrado</p>
+        <div className="card py-8 text-center">
+          <Calendar size={32} className="mx-auto mb-2 text-faint" />
+          <p className="mb-3 text-sm text-faint">Nenhum parcelamento cadastrado</p>
           <Button variant="secondary" size="sm" onClick={() => setIsModalOpen(true)}>
             Registrar parcelamento
           </Button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-6">
           {ongoingInstallments.length > 0 && (
             <section className="space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-700">Em andamento</h2>
-                <span className="text-xs font-medium text-gray-400">
-                  {ongoingInstallments.length} ativo(s)
-                </span>
+                <h2 className="text-sm font-semibold text-ink">Em andamento</h2>
+                <span className="text-xs font-medium text-faint">{ongoingInstallments.length} ativo(s)</span>
               </div>
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
                 {ongoingInstallments.map((view) => renderInstallmentCard(view))}
               </div>
             </section>
@@ -379,26 +359,24 @@ export default function Installments() {
           {finishedInstallments.length > 0 && (
             <section className="space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-700">Finalizados</h2>
-                <span className="text-xs font-medium text-gray-400">
-                  {finishedInstallments.length} completo(s)
-                </span>
+                <h2 className="text-sm font-semibold text-ink">Finalizados</h2>
+                <span className="text-xs font-medium text-faint">{finishedInstallments.length} completo(s)</span>
               </div>
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
                 {finishedInstallments.map((view) => renderInstallmentCard(view))}
               </div>
             </section>
           )}
 
           {ongoingInstallments.length === 0 && finishedInstallments.length === 0 && (
-            <div className="rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">
+            <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-faint">
               Nenhum parcelamento para a referência selecionada
             </div>
           )}
         </div>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={closeModal} title="Novo Parcelamento">
+      <Modal isOpen={isModalOpen} onClose={closeModal} title="Novo parcelamento">
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Descrição"
@@ -429,7 +407,7 @@ export default function Installments() {
             />
           </div>
           {form.totalAmount && form.installmentCount && (
-            <p className="text-xs text-blue-600 bg-blue-50 rounded-lg p-2">
+            <p className="rounded-xl bg-[#E9F0EC] p-2.5 text-xs text-forest">
               {parseInt(form.installmentCount)}x de{' '}
               {formatCurrency(parseFloat(form.totalAmount.replace(',', '.') || '0') / parseInt(form.installmentCount || '1'))}
             </p>
@@ -455,7 +433,7 @@ export default function Installments() {
             </Select>
           </div>
           {selectedAccount?.type === 'CREDIT_CARD' && (
-            <p className="text-xs text-blue-600 bg-blue-50 rounded-lg p-2">
+            <p className="rounded-xl bg-[#E9F0EC] p-2.5 text-xs text-forest">
               {selectedAccount.closingDay && selectedAccount.dueDay
                 ? `Fechamento dia ${selectedAccount.closingDay} · vencimento dia ${selectedAccount.dueDay}. A primeira parcela será calculada automaticamente.`
                 : 'Complete fechamento e vencimento do cartão para calcular a primeira parcela automaticamente.'}
@@ -468,11 +446,11 @@ export default function Installments() {
             onChange={(e) => setForm({ ...form, startDate: e.target.value })}
             required
           />
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <div className="space-y-3 rounded-xl border border-border bg-chip/60 p-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-ink">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-border text-forest focus:ring-forest"
                 checked={form.isThirdParty}
                 onChange={(e) =>
                   setForm({
@@ -486,17 +464,17 @@ export default function Installments() {
               Parcelamento de terceiro
             </label>
             {form.isThirdParty && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Input
                   label="Responsável"
                   value={form.thirdPartyName}
                   onChange={(e) => setForm({ ...form, thirdPartyName: e.target.value })}
                   placeholder="Ex: Lucas"
                 />
-                <label className="flex items-end gap-2 text-sm font-medium text-gray-700 pb-2">
+                <label className="flex items-end gap-2 pb-2 text-sm font-medium text-ink">
                   <input
                     type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="h-4 w-4 rounded border-border text-forest focus:ring-forest"
                     checked={form.isReimbursed}
                     onChange={(e) => setForm({ ...form, isReimbursed: e.target.checked })}
                   />
@@ -514,7 +492,7 @@ export default function Installments() {
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={closeModal}>Cancelar</Button>
             <Button type="submit" className="flex-1" loading={createMutation.isPending}>
-              Criar Parcelamento
+              Criar parcelamento
             </Button>
           </div>
         </form>
@@ -528,9 +506,9 @@ export default function Installments() {
       >
         {deleteTarget && (
           <div className="space-y-4">
-            <div className="space-y-2 text-sm text-gray-600">
+            <div className="space-y-2 text-sm text-muted">
               <p>
-                Escolha como remover <span className="font-semibold text-gray-900">{deleteTarget.description}</span>.
+                Escolha como remover <span className="font-semibold text-ink">{deleteTarget.description}</span>.
               </p>
               <p>
                 Remover parcelas futuras mantém as parcelas já vencidas ou pagas. Remover tudo apaga o grupo inteiro,
@@ -538,7 +516,7 @@ export default function Installments() {
               </p>
             </div>
 
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+            <div className="rounded-xl border border-border bg-chip/60 p-3 text-sm text-ink">
               <p>
                 {deleteTarget.transactions.filter((t) => new Date(t.effectiveDate) <= today).length} parcela(s) já registrada(s)
                 e {deleteTarget.transactions.filter((t) => new Date(t.effectiveDate) > today).length} futura(s).
@@ -556,8 +534,7 @@ export default function Installments() {
               </Button>
               <Button
                 type="button"
-                variant="danger"
-                className="bg-red-600 text-white hover:bg-red-700"
+                className="bg-expense text-white hover:bg-expense/90"
                 onClick={() => removeInstallment('all')}
                 loading={deleteMutation.isPending}
               >
@@ -579,8 +556,8 @@ export default function Installments() {
       >
         {paymentTarget && (
           <form onSubmit={submitPaymentDateUpdate} className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Defina o vencimento da 1ª parcela de <span className="font-semibold text-gray-900">{paymentTarget.description}</span>.
+            <p className="text-sm text-muted">
+              Defina o vencimento da 1ª parcela de <span className="font-semibold text-ink">{paymentTarget.description}</span>.
               As demais parcelas serão ajustadas automaticamente mês a mês.
             </p>
 

@@ -88,67 +88,76 @@ export default function Categories() {
   const expenses = categories.filter((c) => c.type === 'EXPENSE');
   const incomes = categories.filter((c) => c.type === 'INCOME');
 
-  function CategoryList({ items, title }: { items: Category[]; title: string }) {
+  function CategoryRow(c: Category) {
     return (
-      <div className="card">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">{title}</h3>
-        {items.length === 0 ? (
-          <p className="text-sm text-gray-400">Nenhuma categoria</p>
-        ) : (
-          <div className="space-y-2">
-            {items.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 group">
-                <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: c.color }} />
-                <span className="flex-1 text-sm text-gray-700">{c.name}</span>
-                <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => openEdit(c)}
-                    className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                    title="Editar categoria"
-                  >
-                    <Pencil size={12} />
-                  </button>
-                  <button
-                    onClick={() => setDeleteTarget(c)}
-                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                    title="Excluir categoria"
-                  >
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+      <div key={c.id} className="group flex items-center gap-3.5 rounded-2xl px-4 py-3 transition-colors hover:bg-[#FAF9F4]">
+        <span
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px]"
+          style={{ backgroundColor: c.color }}
+        >
+          <span className="h-3 w-3 rounded-[4px] bg-white/60" />
+        </span>
+        <div className="flex-1">
+          <div className="text-sm font-semibold text-ink">{c.name}</div>
+          <div className="text-xs text-faint">{c.type === 'INCOME' ? 'Receita' : 'Despesa'}</div>
+        </div>
+        <div className="flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+          <button
+            onClick={() => openEdit(c)}
+            className="rounded-lg p-1.5 text-faint transition-colors hover:bg-white hover:text-forest"
+            title="Editar categoria"
+          >
+            <Pencil size={14} />
+          </button>
+          <button
+            onClick={() => setDeleteTarget(c)}
+            className="rounded-lg p-1.5 text-faint transition-colors hover:bg-white hover:text-expense"
+            title="Excluir categoria"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div>
+      <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Categorias</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {categories.length} categorias · {expenses.length} despesa(s) · {incomes.length} receita(s)
-          </p>
+          <h1 className="font-display text-[24px] font-bold tracking-tight text-ink">Categorias</h1>
+          <p className="mt-1 text-sm text-muted">Organize suas receitas e despesas</p>
         </div>
         <Button onClick={openCreate} size="sm">
           <Plus size={16} />
-          Nova Categoria
+          Nova categoria
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="card text-center py-8 text-gray-400">Carregando...</div>
+        <div className="card py-8 text-center text-faint">Carregando...</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <CategoryList items={expenses} title="Despesas" />
-          <CategoryList items={incomes} title="Receitas" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="card p-2">
+            <h3 className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-faint">Despesas</h3>
+            {expenses.length === 0 ? (
+              <p className="px-3 pb-2 text-sm text-faint">Nenhuma categoria</p>
+            ) : (
+              <div>{expenses.map(CategoryRow)}</div>
+            )}
+          </div>
+          <div className="card p-2">
+            <h3 className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-faint">Receitas</h3>
+            {incomes.length === 0 ? (
+              <p className="px-3 pb-2 text-sm text-faint">Nenhuma categoria</p>
+            ) : (
+              <div>{incomes.map(CategoryRow)}</div>
+            )}
+          </div>
         </div>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={closeModal} title={editing ? 'Editar Categoria' : 'Nova Categoria'} size="sm">
+      <Modal isOpen={isModalOpen} onClose={closeModal} title={editing ? 'Editar categoria' : 'Nova categoria'} size="sm">
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="Nome"

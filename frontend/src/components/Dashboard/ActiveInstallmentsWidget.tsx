@@ -68,17 +68,17 @@ export default function ActiveInstallmentsWidget() {
     <section className="card">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="flex items-center gap-2 text-base font-semibold text-gray-800">
-            <CalendarClock size={18} className="text-blue-600" />
-            Parcelamentos ativos
+          <h3 className="flex items-center gap-2 font-display text-base font-semibold text-ink">
+            <CalendarClock size={18} className="text-forest" />
+            Comprometido este mês
           </h3>
-          <p className="mt-1 text-xs text-gray-400">
-            {activeInstallments.length} em andamento · saldo futuro {formatCurrency(remainingTotal)}
+          <p className="mt-0.5 text-[12.5px] text-faint">
+            {activeInstallments.length} parcelamento(s) ativo(s) · restam {formatCurrency(remainingTotal)}
           </p>
         </div>
         <Link
           to="/installments"
-          className="inline-flex items-center gap-1 self-start rounded-lg px-2 py-1 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-50"
+          className="inline-flex items-center gap-1 self-start rounded-lg px-2 py-1 text-xs font-semibold text-forest transition-colors hover:bg-chip"
         >
           Ver todos
           <ChevronRight size={14} />
@@ -86,66 +86,27 @@ export default function ActiveInstallmentsWidget() {
       </div>
 
       {isLoading ? (
-        <div className="py-8 text-center text-sm text-gray-400">Carregando...</div>
+        <div className="py-8 text-center text-sm text-faint">Carregando...</div>
       ) : activeInstallments.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-200 py-8 text-center text-sm text-gray-400">
+        <div className="rounded-xl border border-dashed border-border py-8 text-center text-sm text-faint">
           Nenhum parcelamento ativo
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="flex flex-col gap-[14px]">
           {visibleInstallments.map(({ group, paid, total, pct, next, remainingAmount }) => (
-            <div
-              key={group.id}
-              className="rounded-lg border border-gray-100 p-3 transition-colors hover:border-blue-100 hover:bg-blue-50/30"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div
-                    className="h-9 w-9 flex-shrink-0 rounded-lg"
-                    style={{ backgroundColor: `${group.category.color}20` }}
-                  >
-                    <div
-                      className="m-auto mt-3 h-3 w-3 rounded-full"
-                      style={{ backgroundColor: group.category.color }}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-gray-800">{group.description}</p>
-                    <p className="truncate text-xs text-gray-400">
-                      {group.account.name} · {group.category.name}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-left sm:min-w-[260px] sm:text-right">
-                  <div>
-                    <p className="text-[11px] font-medium uppercase text-gray-400">Próxima</p>
-                    <p className="text-sm font-semibold text-gray-700">
-                      {next ? formatDate(next.effectiveDate) : 'Sem data'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium uppercase text-gray-400">Restante</p>
-                    <p className="text-sm font-semibold text-gray-700">
-                      {formatCurrency(remainingAmount)}
-                    </p>
-                  </div>
-                </div>
+            <div key={group.id}>
+              <div className="mb-1.5 flex items-center justify-between gap-3">
+                <span className="truncate text-[13.5px] font-medium text-ink">{group.description}</span>
+                <span className="flex-shrink-0 text-[13px] text-faint">
+                  {paid}/{total} · {formatCurrency(remainingAmount)}
+                  {next ? ` · ${formatDate(next.effectiveDate)}` : ''}
+                </span>
               </div>
-
-              <div className="mt-3">
-                <div className="mb-1 flex items-center justify-between text-xs text-gray-500">
-                  <span>
-                    {paid}/{total} parcelas
-                  </span>
-                  <span>{pct}%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-                  <div
-                    className={clsx('h-full rounded-full transition-all', pct >= 75 ? 'bg-emerald-500' : 'bg-blue-500')}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
+              <div className="h-[7px] overflow-hidden rounded-pill bg-chip">
+                <div
+                  className={clsx('h-full rounded-pill transition-all', pct >= 75 ? 'bg-income' : 'bg-forest')}
+                  style={{ width: `${pct}%` }}
+                />
               </div>
             </div>
           ))}
@@ -153,7 +114,7 @@ export default function ActiveInstallmentsWidget() {
           {activeInstallments.length > visibleInstallments.length && (
             <Link
               to="/installments"
-              className="block rounded-lg border border-dashed border-gray-200 px-3 py-2 text-center text-xs font-semibold text-gray-500 transition-colors hover:border-blue-200 hover:text-blue-600"
+              className="block rounded-xl border border-dashed border-border px-3 py-2 text-center text-xs font-semibold text-muted transition-colors hover:border-forest/30 hover:text-forest"
             >
               Ver mais {activeInstallments.length - visibleInstallments.length} parcelamento(s)
             </Link>

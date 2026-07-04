@@ -14,12 +14,12 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         ref={ref}
         className={clsx(
           'input',
-          error && 'border-red-500 focus:ring-red-500',
+          error && 'border-expense',
           className
         )}
         {...props}
       />
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      {error && <p className="mt-1 text-xs text-expense">{error}</p>}
     </div>
   )
 );

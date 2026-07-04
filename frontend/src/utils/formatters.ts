@@ -15,7 +15,7 @@ export function formatDate(dateStr: string): string {
 
 export function formatMonthYear(month: number, year: number): string {
   const date = new Date(year, month - 1, 1);
-  return format(date, "MMMM 'de' yyyy", { locale: ptBR });
+  return capitalize(format(date, 'MMMM yyyy', { locale: ptBR }));
 }
 
 export function formatMonthShort(month: number, year: number): string {

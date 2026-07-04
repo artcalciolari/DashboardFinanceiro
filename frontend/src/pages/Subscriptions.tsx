@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
-import { clsx } from 'clsx';
 import { subscriptionsApi, accountsApi, categoriesApi } from '../services/api';
 import { useDate } from '../context/DateContext';
-import { formatCurrency, formatDate, formatMonthYear } from '../utils/formatters';
+import { formatCurrency, formatDate } from '../utils/formatters';
 import type { Subscription } from '../types';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -43,6 +42,16 @@ const emptyForm: FormState = {
   isReimbursed: false,
   notes: '',
 };
+
+function initials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+}
 
 function toInputDate(date?: string | null) {
   return date ? date.slice(0, 10) : '';
@@ -99,6 +108,7 @@ export default function Subscriptions() {
     return Number(b.isActive) - Number(a.isActive) || nextA - nextB || a.name.localeCompare(b.name);
   });
 
+  const activeCount = subscriptions.filter((s) => s.isActive).length;
   const monthlyTotal = subscriptions
     .filter((subscription) => subscription.isActive && !subscription.isThirdParty)
     .reduce((sum, subscription) => sum + subscription.amount, 0);
@@ -195,121 +205,88 @@ export default function Subscriptions() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+    <div>
+      <div className="mb-5 flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Assinaturas</h1>
-          <p className="text-sm text-gray-500 mt-0.5 capitalize">
-            {subscriptions.length} assinatura(s) · pessoais {formatCurrency(monthlyTotal)} · terceiros {formatCurrency(thirdPartyTotal)} · referência {formatMonthYear(month, year)}
+          <h1 className="font-display text-[24px] font-bold tracking-tight text-ink">Assinaturas</h1>
+          <p className="mt-1 text-sm capitalize text-muted">
+            {activeCount} ativa(s) · {formatCurrency(monthlyTotal)} por mês
+            {thirdPartyTotal > 0 && ` · terceiros ${formatCurrency(thirdPartyTotal)}`}
           </p>
         </div>
         <Button onClick={openCreate} size="sm">
           <Plus size={16} />
-          Nova Assinatura
+          Nova assinatura
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="card text-center py-8 text-gray-400">Carregando...</div>
+        <div className="card py-8 text-center text-faint">Carregando...</div>
       ) : subscriptions.length === 0 ? (
-        <div className="card text-center py-8">
-          <RefreshCw size={32} className="text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-400 mb-3">Nenhuma assinatura cadastrada</p>
+        <div className="card py-8 text-center">
+          <RefreshCw size={32} className="mx-auto mb-2 text-faint" />
+          <p className="mb-3 text-sm text-faint">Nenhuma assinatura cadastrada</p>
           <Button variant="secondary" size="sm" onClick={openCreate}>
             Registrar assinatura
           </Button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="overflow-hidden rounded-card border border-border bg-card">
           {sortedSubscriptions.map((subscription) => {
             const transactions = subscription.transactions ?? [];
-            const currentTransaction = transactions.find((transaction) => {
-              const effectiveDate = new Date(transaction.effectiveDate);
-              return effectiveDate >= period.start && effectiveDate <= period.end;
-            });
             const nextTransaction = transactions.find(
               (transaction) => new Date(transaction.effectiveDate) > period.end
             );
 
             return (
-              <div key={subscription.id} className="card">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className="p-2 rounded-lg flex-shrink-0"
-                      style={{ backgroundColor: subscription.category.color + '20' }}
-                    >
-                      <RefreshCw size={18} style={{ color: subscription.category.color }} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-gray-800 truncate">{subscription.name}</p>
-                        <span
-                          className={clsx(
-                            'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                            subscription.isActive
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-gray-100 text-gray-500'
-                          )}
-                        >
-                          {subscription.isActive ? 'Ativa' : 'Inativa'}
-                        </span>
-                        {subscription.isThirdParty && (
-                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-                            Terceiro{subscription.thirdPartyName ? `: ${subscription.thirdPartyName}` : ''}
-                          </span>
-                        )}
-                        {subscription.isThirdParty && currentTransaction?.isReimbursed && (
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                            Reembolsado
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        {subscription.account.name} ·{' '}
-                        <span style={{ color: subscription.category.color }}>{subscription.category.name}</span>
-                      </p>
-                    </div>
+              <div
+                key={subscription.id}
+                className="group flex items-center gap-3.5 border-b border-border-faint px-5 py-4 transition-colors last:border-b-0 hover:bg-[#FAF9F4]"
+              >
+                <div
+                  className="flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-xl font-display text-[15px] font-bold"
+                  style={{ backgroundColor: `${subscription.category.color}20`, color: subscription.category.color }}
+                >
+                  {initials(subscription.name)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate text-[14.5px] font-semibold text-ink">{subscription.name}</p>
+                    {!subscription.isActive && (
+                      <span className="rounded-pill bg-chip px-2 py-0.5 text-[10px] font-semibold text-muted">Inativa</span>
+                    )}
+                    {subscription.isThirdParty && (
+                      <span className="rounded-pill bg-amber/10 px-2 py-0.5 text-[10px] font-semibold text-amber">
+                        Terceiro{subscription.thirdPartyName ? `: ${subscription.thirdPartyName}` : ''}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      onClick={() => openEdit(subscription)}
-                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="Editar assinatura"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      onClick={() => setDeleteTarget(subscription)}
-                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Encerrar assinatura"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                  <p className="mt-0.5 text-[12.5px] text-faint">{subscription.account.name}</p>
+                </div>
+                <div className="mr-2 flex-shrink-0 text-right">
+                  <div className="text-[11.5px] text-faint">Próx. cobrança</div>
+                  <div className="text-[13px] font-semibold text-ink">
+                    {nextTransaction ? formatDate(nextTransaction.effectiveDate) : `dia ${subscription.billingDay}`}
                   </div>
                 </div>
-
-                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-                  <div>
-                    <p className="text-xs text-gray-500">Valor mensal</p>
-                    <p className="text-sm font-bold text-gray-800">{formatCurrency(subscription.amount)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Cobrança</p>
-                    <p className="text-sm font-bold text-gray-800">Dia {subscription.billingDay}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Neste mês</p>
-                    <p className="text-sm font-bold text-gray-800">
-                      {currentTransaction ? formatDate(currentTransaction.effectiveDate) : 'Sem cobrança'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500">Próxima</p>
-                    <p className="text-sm font-bold text-gray-800">
-                      {nextTransaction ? formatDate(nextTransaction.effectiveDate) : 'Não prevista'}
-                    </p>
-                  </div>
+                <div className="tabular flex-shrink-0 font-display text-[16px] font-bold text-ink">
+                  {formatCurrency(subscription.amount)}
+                </div>
+                <div className="ml-2 flex flex-shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <button
+                    onClick={() => openEdit(subscription)}
+                    className="rounded-lg p-1.5 text-faint transition-colors hover:bg-chip hover:text-forest"
+                    title="Editar assinatura"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget(subscription)}
+                    className="rounded-lg p-1.5 text-faint transition-colors hover:bg-expense/10 hover:text-expense"
+                    title="Encerrar assinatura"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
             );
@@ -320,7 +297,7 @@ export default function Subscriptions() {
       <Modal
         isOpen={isModalOpen}
         onClose={closeModal}
-        title={editing ? 'Editar Assinatura' : 'Nova Assinatura'}
+        title={editing ? 'Editar assinatura' : 'Nova assinatura'}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
@@ -403,17 +380,17 @@ export default function Subscriptions() {
             </Select>
           </div>
           {selectedAccount?.type === 'CREDIT_CARD' && (
-            <p className="text-xs text-blue-600 bg-blue-50 rounded-lg p-2">
+            <p className="rounded-xl bg-[#E9F0EC] p-2.5 text-xs text-forest">
               {selectedAccount.closingDay && selectedAccount.dueDay
                 ? `Fechamento dia ${selectedAccount.closingDay} · vencimento dia ${selectedAccount.dueDay}. A cobrança mensal respeitará a fatura do cartão.`
                 : 'Complete fechamento e vencimento do cartão para calcular a cobrança automaticamente.'}
             </p>
           )}
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <div className="space-y-3 rounded-xl border border-border bg-chip/60 p-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-ink">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-border text-forest focus:ring-forest"
                 checked={form.isThirdParty}
                 onChange={(e) =>
                   setForm({
@@ -427,17 +404,17 @@ export default function Subscriptions() {
               Assinatura de terceiro
             </label>
             {form.isThirdParty && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Input
                   label="Responsável"
                   value={form.thirdPartyName}
                   onChange={(e) => setForm({ ...form, thirdPartyName: e.target.value })}
                   placeholder="Ex: Lucas"
                 />
-                <label className="flex items-end gap-2 text-sm font-medium text-gray-700 pb-2">
+                <label className="flex items-end gap-2 pb-2 text-sm font-medium text-ink">
                   <input
                     type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="h-4 w-4 rounded border-border text-forest focus:ring-forest"
                     checked={form.isReimbursed}
                     onChange={(e) => setForm({ ...form, isReimbursed: e.target.checked })}
                   />
@@ -446,10 +423,10 @@ export default function Subscriptions() {
               </div>
             )}
           </div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <label className="flex items-center gap-2 text-sm font-medium text-ink">
             <input
               type="checkbox"
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="h-4 w-4 rounded border-border text-forest focus:ring-forest"
               checked={form.isActive}
               onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
             />

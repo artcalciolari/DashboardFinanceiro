@@ -15,14 +15,14 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
         ref={ref}
         className={clsx(
           'input bg-white',
-          error && 'border-red-500 focus:ring-red-500',
+          error && 'border-expense',
           className
         )}
         {...props}
       >
         {children}
       </select>
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      {error && <p className="mt-1 text-xs text-expense">{error}</p>}
     </div>
   )
 );

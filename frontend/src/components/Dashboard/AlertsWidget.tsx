@@ -14,45 +14,45 @@ export default function AlertsWidget() {
   const active = data.filter((a) => a.isTriggered || a.isWarning);
 
   return (
-    <div className={clsx('card border', active.length > 0 ? 'border-amber-100' : 'border-emerald-100')}>
-      <h3 className="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+    <div className="card">
+      <h3 className="mb-3 flex items-center gap-2 font-display text-base font-semibold text-ink">
         {active.length > 0 ? (
-          <AlertTriangle size={18} className="text-amber-500" />
+          <AlertTriangle size={18} className="text-amber" />
         ) : (
-          <CheckCircle size={18} className="text-emerald-500" />
+          <CheckCircle size={18} className="text-income" />
         )}
-        Alertas de Gastos
+        Alertas de gastos
       </h3>
       {isLoading ? (
-        <div className="py-8 text-center text-sm text-gray-400">Carregando...</div>
+        <div className="py-8 text-center text-sm text-faint">Carregando...</div>
       ) : data.length === 0 ? (
-        <div className="py-8 text-center text-sm text-gray-400">Nenhum alerta configurado</div>
+        <div className="py-8 text-center text-sm text-faint">Nenhum alerta configurado</div>
       ) : active.length === 0 ? (
-        <div className="py-8 text-center text-sm text-gray-400">Nenhum alerta próximo do limite</div>
+        <div className="py-8 text-center text-sm text-faint">Nenhum alerta próximo do limite</div>
       ) : (
-        <div className="space-y-3">
+        <div className="flex flex-col gap-3">
           {active.map((alert) => {
             const pct = Math.min(alert.percentage, 100);
             return (
               <div key={alert.id}>
-                <div className="flex items-center justify-between mb-1">
+                <div className="mb-1 flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     {alert.isTriggered ? (
-                      <XCircle size={14} className="text-red-500" />
+                      <XCircle size={14} className="text-expense" />
                     ) : (
-                      <CheckCircle size={14} className="text-amber-500" />
+                      <CheckCircle size={14} className="text-amber" />
                     )}
-                    <span className="text-sm font-medium text-gray-700">{alert.name}</span>
+                    <span className="text-sm font-medium text-ink">{alert.name}</span>
                   </div>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-faint">
                     {formatCurrency(alert.currentAmount)} / {formatCurrency(alert.limitAmount)}
                   </span>
                 </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-2 overflow-hidden rounded-pill bg-chip">
                   <div
                     className={clsx(
-                      'h-full rounded-full transition-all',
-                      alert.isTriggered ? 'bg-red-500' : 'bg-amber-400'
+                      'h-full rounded-pill transition-all',
+                      alert.isTriggered ? 'bg-expense' : 'bg-amber'
                     )}
                     style={{ width: `${pct}%` }}
                   />
