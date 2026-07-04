@@ -3,6 +3,7 @@ import MonthlyChart from '../components/Dashboard/MonthlyChart';
 import CategoryChart from '../components/Dashboard/CategoryChart';
 import AlertsWidget from '../components/Dashboard/AlertsWidget';
 import AccountSummaryWidget from '../components/Dashboard/AccountSummaryWidget';
+import ActiveInstallmentsWidget from '../components/Dashboard/ActiveInstallmentsWidget';
 import { useDate } from '../context/DateContext';
 import { formatMonthYear } from '../utils/formatters';
 
@@ -29,6 +30,8 @@ export default function Dashboard() {
         <AccountSummaryWidget />
         <AlertsWidget />
       </div>
+
+      <ActiveInstallmentsWidget />
     </div>
   );
 }
