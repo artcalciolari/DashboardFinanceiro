@@ -7,7 +7,8 @@ import { ensureSubscriptionTransactions, getSubscriptionHorizon } from '../servi
 import { parsePeriodQuery } from '../utils/period';
 
 function safeSpreadsheetCell(value: string) {
-  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  const trimmed = value.trimStart();
+  return /^[=+\-@\t\r]/.test(trimmed) ? `'${value}` : value;
 }
 
 export async function exportCSV(req: Request, res: Response, next: NextFunction) {

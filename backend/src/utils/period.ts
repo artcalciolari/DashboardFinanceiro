@@ -13,6 +13,7 @@ const PeriodSchema = z.object({
 });
 
 function singleQueryValue(value: unknown) {
+  if (Array.isArray(value)) return value.length === 1 ? value[0] : '__invalid__';
   return typeof value === 'string' ? value : undefined;
 }
 
