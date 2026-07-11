@@ -1,4 +1,4 @@
-import { useEffect, useRef, ReactNode } from 'react';
+import { useEffect, useId, useRef, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -13,13 +13,45 @@ interface ModalProps {
 
 export default function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
+
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (!first || !last) {
+          e.preventDefault();
+          dialogRef.current.focus();
+        } else if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     }
-    if (isOpen) document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    if (!isOpen) return undefined;
+
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    document.addEventListener('keydown', handleKeyDown);
+    requestAnimationFrame(() => {
+      dialogRef.current?.querySelector<HTMLElement>('input, select, textarea, button')?.focus();
+    });
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previousFocusRef.current?.focus();
+    };
   }, [isOpen, onClose]);
 
   useEffect(() => {
@@ -43,16 +75,18 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className={clsx(
           'w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[22px] bg-card shadow-modal animate-[sc-rise_.28s_ease_both]',
           sizeClass
         )}
       >
         <div className="flex items-center justify-between p-5 pb-4">
-          <h2 id="modal-title" className="font-display text-xl font-bold text-ink">{title}</h2>
+          <h2 id={titleId} className="font-display text-xl font-bold text-ink">{title}</h2>
           <button
             type="button"
             onClick={onClose}

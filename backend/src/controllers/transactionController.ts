@@ -1,15 +1,21 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import type { Account, Transaction } from '@prisma/client';
+import type { Account, Category, Transaction } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { calculateEffectiveDate } from '../utils/creditCard';
 import { ensureSubscriptionTransactions, getSubscriptionHorizon } from '../services/subscriptionService';
+import { HttpError } from '../utils/httpError';
+import { parsePeriodQuery } from '../utils/period';
+
+const DateString = z.string().refine((value) => !Number.isNaN(new Date(value).getTime()), {
+  message: 'Data inválida',
+});
 
 const TransactionSchema = z.object({
   description: z.string().min(1, 'Descrição é obrigatória'),
   amount: z.number().positive('Valor deve ser positivo'),
   type: z.enum(['INCOME', 'EXPENSE']),
-  date: z.string(),
+  date: DateString,
   accountId: z.string(),
   categoryId: z.string(),
   isThirdParty: z.boolean().optional(),
@@ -19,6 +25,33 @@ const TransactionSchema = z.object({
 });
 
 type TransactionInput = z.infer<typeof TransactionSchema>;
+type ExistingTransaction = Transaction & { account: Account; category: Category };
+
+async function ensureCategoryMatchesType(categoryId: string, type: TransactionInput['type']) {
+  const category = await prisma.category.findUniqueOrThrow({ where: { id: categoryId } });
+  if (category.type !== type) {
+    throw new HttpError(
+      422,
+      'A categoria precisa ter o mesmo tipo da transação',
+      'CATEGORY_TYPE_MISMATCH'
+    );
+  }
+}
+
+async function ensureTransactionIsManual(id: string) {
+  const transaction = await prisma.transaction.findUniqueOrThrow({
+    where: { id },
+    select: { installmentGroupId: true, subscriptionId: true },
+  });
+
+  if (transaction.installmentGroupId || transaction.subscriptionId) {
+    throw new HttpError(
+      409,
+      'Lançamentos de parcelamentos e assinaturas devem ser gerenciados na página de origem',
+      'GENERATED_TRANSACTION'
+    );
+  }
+}
 
 function getThirdPartyData(
   type: TransactionInput['type'],
@@ -37,13 +70,14 @@ function getThirdPartyData(
 
 export async function getTransactions(req: Request, res: Response, next: NextFunction) {
   try {
-    const { month, year, accountId, categoryId, type } = req.query;
+    const { accountId, categoryId, type } = req.query;
+    const { month, year } = parsePeriodQuery(req.query);
 
     const where: Record<string, unknown> = {};
 
-    if (month && year) {
-      const startDate = new Date(Number(year), Number(month) - 1, 1);
-      const endDate = new Date(Number(year), Number(month), 0, 23, 59, 59);
+    if (month !== undefined && year !== undefined) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0, 23, 59, 59, 999);
       where.effectiveDate = { gte: startDate, lte: endDate };
       await ensureSubscriptionTransactions(endDate);
     } else {
@@ -73,6 +107,7 @@ export async function createTransaction(req: Request, res: Response, next: NextF
     const account = await prisma.account.findUniqueOrThrow({
       where: { id: data.accountId },
     });
+    await ensureCategoryMatchesType(data.categoryId, data.type);
 
     const purchaseDate = new Date(data.date);
     const effectiveDate = calculateEffectiveDate(
@@ -110,20 +145,21 @@ export async function createTransaction(req: Request, res: Response, next: NextF
 
 export async function updateTransaction(req: Request, res: Response, next: NextFunction) {
   try {
+    await ensureTransactionIsManual(req.params.id);
     const data = TransactionSchema.partial().parse(req.body);
 
     let effectiveDate: Date | undefined;
-    let existing: (Transaction & { account: Account }) | undefined;
+    let existing: ExistingTransaction | undefined;
     const touchesThirdParty =
       data.type ||
       data.isThirdParty !== undefined ||
       data.thirdPartyName !== undefined ||
       data.isReimbursed !== undefined;
 
-    if (data.date || data.accountId || touchesThirdParty) {
+    if (data.date || data.accountId || data.categoryId || data.type || touchesThirdParty) {
       existing = await prisma.transaction.findUniqueOrThrow({
         where: { id: req.params.id },
-        include: { account: true },
+        include: { account: true, category: true },
       });
     }
 
@@ -131,7 +167,7 @@ export async function updateTransaction(req: Request, res: Response, next: NextF
       if (!existing) {
         existing = await prisma.transaction.findUniqueOrThrow({
           where: { id: req.params.id },
-          include: { account: true },
+          include: { account: true, category: true },
         });
       }
       const account = data.accountId
@@ -143,6 +179,25 @@ export async function updateTransaction(req: Request, res: Response, next: NextF
         account.closingDay,
         account.dueDay
       );
+    }
+
+    if (data.categoryId || data.type) {
+      if (!existing) {
+        existing = await prisma.transaction.findUniqueOrThrow({
+          where: { id: req.params.id },
+          include: { account: true, category: true },
+        });
+      }
+
+      if (data.categoryId) {
+        await ensureCategoryMatchesType(data.categoryId, data.type ?? existing.type);
+      } else if (existing.category.type !== data.type) {
+        throw new HttpError(
+          422,
+          'A categoria precisa ter o mesmo tipo da transação',
+          'CATEGORY_TYPE_MISMATCH'
+        );
+      }
     }
 
     const transaction = await prisma.transaction.update({
@@ -171,6 +226,7 @@ export async function updateTransaction(req: Request, res: Response, next: NextF
 
 export async function deleteTransaction(req: Request, res: Response, next: NextFunction) {
   try {
+    await ensureTransactionIsManual(req.params.id);
     await prisma.transaction.delete({ where: { id: req.params.id } });
     res.status(204).send();
   } catch (err) {

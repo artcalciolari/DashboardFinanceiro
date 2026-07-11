@@ -9,6 +9,7 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import ColorPicker from '../components/ui/ColorPicker';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import FormError from '../components/ui/FormError';
 
 interface FormState {
   name: string;
@@ -73,6 +74,8 @@ export default function Categories() {
     setIsModalOpen(false);
     setEditing(null);
     setForm(emptyForm);
+    createMutation.reset();
+    updateMutation.reset();
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -101,18 +104,20 @@ export default function Categories() {
           <div className="text-sm font-semibold text-ink">{c.name}</div>
           <div className="text-xs text-faint">{c.type === 'INCOME' ? 'Receita' : 'Despesa'}</div>
         </div>
-        <div className="flex gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+        <div className="flex gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
           <button
             onClick={() => openEdit(c)}
-            className="rounded-lg p-1.5 text-faint transition-colors hover:bg-white hover:text-forest"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors hover:bg-white hover:text-forest"
             title="Editar categoria"
+            aria-label={`Editar ${c.name}`}
           >
             <Pencil size={14} />
           </button>
           <button
             onClick={() => setDeleteTarget(c)}
-            className="rounded-lg p-1.5 text-faint transition-colors hover:bg-white hover:text-expense"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors hover:bg-white hover:text-expense"
             title="Excluir categoria"
+            aria-label={`Excluir ${c.name}`}
           >
             <Trash2 size={14} />
           </button>
@@ -179,6 +184,7 @@ export default function Categories() {
             value={form.color}
             onChange={(color) => setForm({ ...form, color })}
           />
+          <FormError error={createMutation.error ?? updateMutation.error} />
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={closeModal}>Cancelar</Button>
             <Button type="submit" className="flex-1" loading={createMutation.isPending || updateMutation.isPending}>
@@ -194,8 +200,12 @@ export default function Categories() {
         description={`Excluir "${deleteTarget?.name ?? ''}"? Transações que usam esta categoria podem impedir a exclusão.`}
         confirmLabel="Excluir"
         loading={deleteMutation.isPending}
+        error={deleteMutation.error}
         onClose={() => {
-          if (!deleteMutation.isPending) setDeleteTarget(null);
+          if (!deleteMutation.isPending) {
+            setDeleteTarget(null);
+            deleteMutation.reset();
+          }
         }}
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget.id);

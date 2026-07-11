@@ -3,13 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
 import { subscriptionsApi, accountsApi, categoriesApi } from '../services/api';
 import { useDate } from '../context/DateContext';
-import { formatCurrency, formatDate } from '../utils/formatters';
+import { formatCurrency, formatDate, parseCurrencyBR } from '../utils/formatters';
 import type { Subscription } from '../types';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import FormError from '../components/ui/FormError';
+import { getLocalDateInput } from '../utils/formatters';
 
 interface FormState {
   name: string;
@@ -26,22 +28,23 @@ interface FormState {
   notes: string;
 }
 
-const todayInput = new Date().toISOString().slice(0, 10);
-
-const emptyForm: FormState = {
-  name: '',
-  amount: '',
-  startDate: todayInput,
-  endDate: '',
-  billingDay: String(new Date().getDate()),
-  accountId: '',
-  categoryId: '',
-  isActive: true,
-  isThirdParty: false,
-  thirdPartyName: '',
-  isReimbursed: false,
-  notes: '',
-};
+function createEmptyForm(): FormState {
+  const today = new Date();
+  return {
+    name: '',
+    amount: '',
+    startDate: getLocalDateInput(today),
+    endDate: '',
+    billingDay: String(today.getDate()),
+    accountId: '',
+    categoryId: '',
+    isActive: true,
+    isThirdParty: false,
+    thirdPartyName: '',
+    isReimbursed: false,
+    notes: '',
+  };
+}
 
 function initials(name: string) {
   return name
@@ -79,7 +82,7 @@ export default function Subscriptions() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editing, setEditing] = useState<Subscription | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Subscription | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [form, setForm] = useState<FormState>(createEmptyForm);
 
   const { data: subscriptions = [], isLoading } = useQuery({
     queryKey: ['subscriptions'],
@@ -150,7 +153,7 @@ export default function Subscriptions() {
 
   function openCreate() {
     setEditing(null);
-    setForm(emptyForm);
+    setForm(createEmptyForm());
     setIsModalOpen(true);
   }
 
@@ -176,7 +179,9 @@ export default function Subscriptions() {
   function closeModal() {
     setIsModalOpen(false);
     setEditing(null);
-    setForm(emptyForm);
+    setForm(createEmptyForm());
+    createMutation.reset();
+    updateMutation.reset();
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -184,7 +189,7 @@ export default function Subscriptions() {
 
     const payload = {
       name: form.name,
-      amount: parseFloat(form.amount.replace(',', '.')),
+      amount: parseCurrencyBR(form.amount),
       startDate: toIsoDate(form.startDate),
       endDate: form.endDate ? toIsoDate(form.endDate) : null,
       billingDay: parseInt(form.billingDay),
@@ -272,18 +277,20 @@ export default function Subscriptions() {
                 <div className="tabular flex-shrink-0 font-display text-[16px] font-bold text-ink">
                   {formatCurrency(subscription.amount)}
                 </div>
-                <div className="ml-2 flex flex-shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="ml-2 flex flex-shrink-0 gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
                   <button
                     onClick={() => openEdit(subscription)}
-                    className="rounded-lg p-1.5 text-faint transition-colors hover:bg-chip hover:text-forest"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors hover:bg-chip hover:text-forest"
                     title="Editar assinatura"
+                    aria-label={`Editar ${subscription.name}`}
                   >
                     <Pencil size={14} />
                   </button>
                   <button
                     onClick={() => setDeleteTarget(subscription)}
-                    className="rounded-lg p-1.5 text-faint transition-colors hover:bg-expense/10 hover:text-expense"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors hover:bg-expense/10 hover:text-expense"
                     title="Encerrar assinatura"
+                    aria-label={`Encerrar ${subscription.name}`}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -438,6 +445,7 @@ export default function Subscriptions() {
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
             placeholder="Notas adicionais..."
           />
+          <FormError error={createMutation.error ?? updateMutation.error} />
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={closeModal}>
               Cancelar
@@ -459,8 +467,12 @@ export default function Subscriptions() {
         description={`Encerrar "${deleteTarget?.name ?? ''}"? As cobranças futuras serão removidas, mas os meses antigos permanecem no histórico.`}
         confirmLabel="Encerrar"
         loading={deleteMutation.isPending}
+        error={deleteMutation.error}
         onClose={() => {
-          if (!deleteMutation.isPending) setDeleteTarget(null);
+          if (!deleteMutation.isPending) {
+            setDeleteTarget(null);
+            deleteMutation.reset();
+          }
         }}
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget.id);

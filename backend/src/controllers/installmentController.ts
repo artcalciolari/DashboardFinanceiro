@@ -3,12 +3,17 @@ import { z } from 'zod';
 import { addMonths } from 'date-fns';
 import prisma from '../lib/prisma';
 import { calculateEffectiveDate } from '../utils/creditCard';
+import { HttpError } from '../utils/httpError';
+
+const DateString = z.string().refine((value) => !Number.isNaN(new Date(value).getTime()), {
+  message: 'Data inválida',
+});
 
 const InstallmentSchema = z.object({
   description: z.string().min(1, 'Descrição é obrigatória'),
   totalAmount: z.number().positive('Valor total deve ser positivo'),
-  installmentCount: z.number().int().min(2, 'Mínimo 2 parcelas'),
-  startDate: z.string(),
+  installmentCount: z.number().int().min(2, 'Mínimo 2 parcelas').max(120, 'Máximo 120 parcelas'),
+  startDate: DateString,
   accountId: z.string(),
   categoryId: z.string(),
   isThirdParty: z.boolean().optional(),
@@ -18,7 +23,7 @@ const InstallmentSchema = z.object({
 });
 
 const UpdatePaymentDateSchema = z.object({
-  firstPaymentDate: z.string(),
+  firstPaymentDate: DateString,
 });
 
 export async function getInstallments(req: Request, res: Response, next: NextFunction) {
@@ -41,6 +46,11 @@ export async function createInstallment(req: Request, res: Response, next: NextF
   try {
     const data = InstallmentSchema.parse(req.body);
     const account = await prisma.account.findUniqueOrThrow({ where: { id: data.accountId } });
+    const category = await prisma.category.findUniqueOrThrow({ where: { id: data.categoryId } });
+
+    if (category.type !== 'EXPENSE') {
+      throw new HttpError(422, 'Parcelamentos devem usar uma categoria de despesa', 'CATEGORY_TYPE_MISMATCH');
+    }
 
     const totalCents = Math.round(data.totalAmount * 100);
     const totalAmount = totalCents / 100;
@@ -59,55 +69,57 @@ export async function createInstallment(req: Request, res: Response, next: NextF
       account.dueDay
     );
 
-    const group = await prisma.installmentGroup.create({
-      data: {
-        description: data.description,
-        totalAmount,
-        installmentCount: data.installmentCount,
-        startDate,
-        isThirdParty,
-        thirdPartyName: isThirdParty ? data.thirdPartyName?.trim() || null : null,
-        isReimbursed: isThirdParty ? data.isReimbursed ?? false : false,
-        accountId: data.accountId,
-        categoryId: data.categoryId,
-      },
-    });
-
-    const transactionsData = [];
-    for (let i = 0; i < data.installmentCount; i++) {
-      const purchaseDate = addMonths(startDate, i);
-      const effectiveDate = addMonths(firstPaymentDate, i);
-      const installmentCents = baseInstallmentCents + (
-        i === data.installmentCount - 1 ? remainderCents : 0
-      );
-
-      transactionsData.push({
-        description: `${data.description} (${i + 1}/${data.installmentCount})`,
-        amount: installmentCents / 100,
-        type: 'EXPENSE' as const,
-        date: purchaseDate,
-        effectiveDate,
-        accountId: data.accountId,
-        categoryId: data.categoryId,
-        installmentGroupId: group.id,
-        installmentNumber: i + 1,
-        totalInstallments: data.installmentCount,
-        isThirdParty,
-        thirdPartyName: isThirdParty ? data.thirdPartyName?.trim() || null : null,
-        isReimbursed: isThirdParty ? data.isReimbursed ?? false : false,
-        notes: data.notes,
+    const result = await prisma.$transaction(async (tx) => {
+      const group = await tx.installmentGroup.create({
+        data: {
+          description: data.description,
+          totalAmount,
+          installmentCount: data.installmentCount,
+          startDate,
+          isThirdParty,
+          thirdPartyName: isThirdParty ? data.thirdPartyName?.trim() || null : null,
+          isReimbursed: isThirdParty ? data.isReimbursed ?? false : false,
+          accountId: data.accountId,
+          categoryId: data.categoryId,
+        },
       });
-    }
 
-    await prisma.transaction.createMany({ data: transactionsData });
+      const transactionsData = [];
+      for (let i = 0; i < data.installmentCount; i++) {
+        const purchaseDate = addMonths(startDate, i);
+        const effectiveDate = addMonths(firstPaymentDate, i);
+        const installmentCents = baseInstallmentCents + (
+          i === data.installmentCount - 1 ? remainderCents : 0
+        );
 
-    const result = await prisma.installmentGroup.findUnique({
-      where: { id: group.id },
-      include: {
-        account: true,
-        category: true,
-        transactions: { orderBy: { date: 'asc' } },
-      },
+        transactionsData.push({
+          description: `${data.description} (${i + 1}/${data.installmentCount})`,
+          amount: installmentCents / 100,
+          type: 'EXPENSE' as const,
+          date: purchaseDate,
+          effectiveDate,
+          accountId: data.accountId,
+          categoryId: data.categoryId,
+          installmentGroupId: group.id,
+          installmentNumber: i + 1,
+          totalInstallments: data.installmentCount,
+          isThirdParty,
+          thirdPartyName: isThirdParty ? data.thirdPartyName?.trim() || null : null,
+          isReimbursed: isThirdParty ? data.isReimbursed ?? false : false,
+          notes: data.notes,
+        });
+      }
+
+      await tx.transaction.createMany({ data: transactionsData });
+
+      return tx.installmentGroup.findUnique({
+        where: { id: group.id },
+        include: {
+          account: true,
+          category: true,
+          transactions: { orderBy: { date: 'asc' } },
+        },
+      });
     });
 
     res.status(201).json(result);
@@ -128,20 +140,27 @@ export async function deleteInstallment(req: Request, res: Response, next: NextF
         prisma.installmentGroup.delete({ where: { id: req.params.id } }),
       ]);
     } else {
-      await prisma.transaction.deleteMany({
-        where: {
-          installmentGroupId: req.params.id,
-          effectiveDate: { gte: new Date() },
-        },
-      });
+      await prisma.$transaction(async (tx) => {
+        await tx.transaction.deleteMany({
+          where: {
+            installmentGroupId: req.params.id,
+            effectiveDate: { gte: new Date() },
+          },
+        });
 
-      const remaining = await prisma.transaction.count({
-        where: { installmentGroupId: req.params.id },
-      });
+        const remaining = await tx.transaction.count({
+          where: { installmentGroupId: req.params.id },
+        });
 
-      if (remaining === 0) {
-        await prisma.installmentGroup.delete({ where: { id: req.params.id } });
-      }
+        if (remaining === 0) {
+          await tx.installmentGroup.delete({ where: { id: req.params.id } });
+        } else {
+          await tx.installmentGroup.update({
+            where: { id: req.params.id },
+            data: { isCancelled: true, cancelledAt: new Date() },
+          });
+        }
+      });
     }
 
     res.status(204).send();
@@ -158,6 +177,11 @@ export async function updateInstallmentPaymentDate(req: Request, res: Response, 
     if (Number.isNaN(firstDate.getTime())) {
       res.status(400).json({ message: 'Data de pagamento inválida' });
       return;
+    }
+
+    const group = await prisma.installmentGroup.findUniqueOrThrow({ where: { id: req.params.id } });
+    if (group.isCancelled) {
+      throw new HttpError(409, 'Não é possível alterar um parcelamento cancelado', 'INSTALLMENT_CANCELLED');
     }
 
     const transactions = await prisma.transaction.findMany({

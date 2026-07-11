@@ -85,7 +85,7 @@ export default function Sidebar() {
       </aside>
 
       {/* Mobile bottom navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-40 flex">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex overflow-x-auto border-t border-border bg-card pb-[env(safe-area-inset-bottom)]">
         {navItems.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
@@ -93,7 +93,7 @@ export default function Sidebar() {
             end={end}
             className={({ isActive }) =>
               clsx(
-                'flex-1 min-w-0 flex flex-col items-center justify-center py-2 text-[10px] transition-colors',
+                'min-w-[64px] flex-1 flex flex-col items-center justify-center py-2.5 text-[11px] transition-colors',
                 isActive ? 'text-forest' : 'text-faint'
               )
             }

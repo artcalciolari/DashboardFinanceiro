@@ -1,4 +1,4 @@
-import { SelectHTMLAttributes, forwardRef, ReactNode } from 'react';
+import { SelectHTMLAttributes, forwardRef, ReactNode, useId } from 'react';
 import { clsx } from 'clsx';
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
@@ -8,23 +8,32 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, children, className, ...props }, ref) => (
-    <div className="w-full">
-      {label && <label className="label">{label}</label>}
+  ({ label, error, children, className, id, ...props }, ref) => {
+    const generatedId = useId();
+    const selectId = id ?? generatedId;
+    const errorId = `${selectId}-error`;
+
+    return (
+      <div className="w-full">
+      {label && <label className="label" htmlFor={selectId}>{label}</label>}
       <select
         ref={ref}
+        id={selectId}
         className={clsx(
           'input bg-white',
           error && 'border-expense',
           className
         )}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
         {...props}
       >
         {children}
       </select>
-      {error && <p className="mt-1 text-xs text-expense">{error}</p>}
-    </div>
-  )
+      {error && <p id={errorId} className="mt-1 text-xs text-expense">{error}</p>}
+      </div>
+    );
+  }
 );
 
 Select.displayName = 'Select';

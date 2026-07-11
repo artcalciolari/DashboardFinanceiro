@@ -8,6 +8,8 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
+import FormError from '../ui/FormError';
+import { getLocalDateInput, parseCurrencyBR } from '../../utils/formatters';
 
 interface FormState {
   description: string;
@@ -22,18 +24,20 @@ interface FormState {
   notes: string;
 }
 
-const emptyForm: FormState = {
-  description: '',
-  amount: '',
-  type: 'EXPENSE',
-  date: new Date().toISOString().slice(0, 10),
-  accountId: '',
-  categoryId: '',
-  isThirdParty: false,
-  thirdPartyName: '',
-  isReimbursed: false,
-  notes: '',
-};
+function createEmptyForm(): FormState {
+  return {
+    description: '',
+    amount: '',
+    type: 'EXPENSE',
+    date: getLocalDateInput(),
+    accountId: '',
+    categoryId: '',
+    isThirdParty: false,
+    thirdPartyName: '',
+    isReimbursed: false,
+    notes: '',
+  };
+}
 
 function formFromTransaction(t: Transaction): FormState {
   return {
@@ -53,10 +57,10 @@ function formFromTransaction(t: Transaction): FormState {
 export default function TransactionFormModal() {
   const { isOpen, editing, close } = useTransactionModal();
   const qc = useQueryClient();
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [form, setForm] = useState<FormState>(createEmptyForm);
 
   useEffect(() => {
-    setForm(editing ? formFromTransaction(editing) : emptyForm);
+    setForm(editing ? formFromTransaction(editing) : createEmptyForm());
   }, [editing, isOpen]);
 
   const { data: accounts = [] } = useQuery({ queryKey: ['accounts'], queryFn: accountsApi.getAll });
@@ -77,12 +81,19 @@ export default function TransactionFormModal() {
       transactionsApi.update(id, data),
     onSuccess: () => { invalidate(); close(); },
   });
+  const mutationError = createMutation.error ?? updateMutation.error;
+
+  function handleClose() {
+    createMutation.reset();
+    updateMutation.reset();
+    close();
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const payload = {
       description: form.description,
-      amount: parseFloat(form.amount.replace(',', '.')),
+      amount: parseCurrencyBR(form.amount),
       type: form.type,
       date: new Date(form.date + 'T12:00:00').toISOString(),
       accountId: form.accountId,
@@ -107,7 +118,7 @@ export default function TransactionFormModal() {
   const segBase = 'flex-1 py-2 rounded-[9px] font-semibold text-[13.5px] transition-colors';
 
   return (
-    <Modal isOpen={isOpen} onClose={close} title={editing ? 'Editar transação' : 'Nova transação'}>
+    <Modal isOpen={isOpen} onClose={handleClose} title={editing ? 'Editar transação' : 'Nova transação'}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="inline-flex w-full gap-0.5 rounded-xl bg-[#EDEAE0] p-1">
           <button
@@ -250,6 +261,7 @@ export default function TransactionFormModal() {
           onChange={(e) => setForm({ ...form, notes: e.target.value })}
           placeholder="Notas adicionais..."
         />
+        <FormError error={mutationError} />
         {selectedAccount?.type === 'CREDIT_CARD' && (
           <div className="rounded-xl bg-[#E9F0EC] p-2.5 text-xs text-forest">
             {selectedAccount.closingDay
@@ -258,7 +270,7 @@ export default function TransactionFormModal() {
           </div>
         )}
         <div className="flex gap-2 pt-2">
-          <Button type="button" variant="secondary" className="flex-1" onClick={close}>
+          <Button type="button" variant="secondary" className="flex-1" onClick={handleClose}>
             Cancelar
           </Button>
           <Button

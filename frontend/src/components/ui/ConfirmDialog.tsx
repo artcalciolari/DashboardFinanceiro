@@ -1,5 +1,6 @@
 import Modal from './Modal';
 import Button from './Button';
+import FormError from './FormError';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   loading?: boolean;
+  error?: unknown;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -19,6 +21,7 @@ export default function ConfirmDialog({
   confirmLabel = 'Confirmar',
   cancelLabel = 'Cancelar',
   loading,
+  error,
   onClose,
   onConfirm,
 }: ConfirmDialogProps) {
@@ -26,6 +29,7 @@ export default function ConfirmDialog({
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
       <div className="space-y-4">
         <p className="text-sm text-muted">{description}</p>
+        <FormError error={error} />
         <div className="flex gap-2 pt-1">
           <Button
             type="button"

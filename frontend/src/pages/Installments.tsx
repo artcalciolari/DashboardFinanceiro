@@ -2,14 +2,16 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Calendar, Pencil } from 'lucide-react';
 import { installmentsApi, accountsApi, categoriesApi } from '../services/api';
-import { formatCurrency, formatDate } from '../utils/formatters';
+import { formatCurrency, formatDate, parseCurrencyBR } from '../utils/formatters';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
+import FormError from '../components/ui/FormError';
 import { clsx } from 'clsx';
 import type { InstallmentGroup } from '../types';
 import { useDate } from '../context/DateContext';
+import { getLocalDateInput } from '../utils/formatters';
 
 interface FormState {
   description: string;
@@ -33,20 +35,23 @@ interface InstallmentView {
   next?: InstallmentGroup['transactions'][number];
   last?: InstallmentGroup['transactions'][number];
   isFinished: boolean;
+  isCancelled: boolean;
 }
 
-const emptyForm: FormState = {
-  description: '',
-  totalAmount: '',
-  installmentCount: '2',
-  startDate: new Date().toISOString().slice(0, 10),
-  accountId: '',
-  categoryId: '',
-  isThirdParty: false,
-  thirdPartyName: '',
-  isReimbursed: false,
-  notes: '',
-};
+function createEmptyForm(): FormState {
+  return {
+    description: '',
+    totalAmount: '',
+    installmentCount: '2',
+    startDate: getLocalDateInput(),
+    accountId: '',
+    categoryId: '',
+    isThirdParty: false,
+    thirdPartyName: '',
+    isReimbursed: false,
+    notes: '',
+  };
+}
 
 function isoDateToBr(date: string) {
   const [year, month, day] = date.slice(0, 10).split('-');
@@ -87,6 +92,7 @@ function buildInstallmentView(group: InstallmentGroup, periodEnd: Date): Install
   const paid = installments.filter((t) => new Date(t.effectiveDate) <= periodEnd).length;
   const total = group.installmentCount;
   const pct = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
+  const isCancelled = group.isCancelled;
 
   return {
     group,
@@ -96,7 +102,8 @@ function buildInstallmentView(group: InstallmentGroup, periodEnd: Date): Install
     installmentAmount: total > 0 ? group.totalAmount / total : 0,
     next: installments.find((t) => new Date(t.effectiveDate) > periodEnd),
     last: installments[installments.length - 1],
-    isFinished: total > 0 && paid >= total,
+    isFinished: !isCancelled && total > 0 && paid >= total,
+    isCancelled,
   };
 }
 
@@ -108,7 +115,7 @@ export default function Installments() {
   const [paymentTarget, setPaymentTarget] = useState<InstallmentGroup | null>(null);
   const [firstPaymentDate, setFirstPaymentDate] = useState('');
   const [firstPaymentDateError, setFirstPaymentDateError] = useState('');
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [form, setForm] = useState<FormState>(createEmptyForm);
 
   const { data: groups = [], isLoading } = useQuery({
     queryKey: ['installments'],
@@ -124,7 +131,7 @@ export default function Installments() {
   const selectedAccount = accounts.find((account) => account.id === form.accountId);
   const installmentViews = groups.map((group) => buildInstallmentView(group, selectedPeriodEnd));
   const ongoingInstallments = installmentViews
-    .filter((view) => !view.isFinished)
+    .filter((view) => !view.isFinished && !view.isCancelled)
     .sort((a, b) => {
       const nextA = a.next ? new Date(a.next.effectiveDate).getTime() : Number.POSITIVE_INFINITY;
       const nextB = b.next ? new Date(b.next.effectiveDate).getTime() : Number.POSITIVE_INFINITY;
@@ -138,6 +145,13 @@ export default function Installments() {
       const lastB = b.last ? new Date(b.last.effectiveDate).getTime() : 0;
 
       return lastB - lastA || a.group.description.localeCompare(b.group.description);
+    });
+  const cancelledInstallments = installmentViews
+    .filter((view) => view.isCancelled)
+    .sort((a, b) => {
+      const cancelledA = a.group.cancelledAt ? new Date(a.group.cancelledAt).getTime() : 0;
+      const cancelledB = b.group.cancelledAt ? new Date(b.group.cancelledAt).getTime() : 0;
+      return cancelledB - cancelledA || a.group.description.localeCompare(b.group.description);
     });
 
   const committedMonthly = ongoingInstallments.reduce((sum, view) => sum + view.installmentAmount, 0);
@@ -174,12 +188,14 @@ export default function Installments() {
 
   function closeModal() {
     setIsModalOpen(false);
-    setForm(emptyForm);
+    setForm(createEmptyForm());
+    createMutation.reset();
   }
 
   function closeDeleteModal() {
     if (!deleteMutation.isPending) {
       setDeleteTarget(null);
+      deleteMutation.reset();
     }
   }
 
@@ -203,6 +219,7 @@ export default function Installments() {
       setPaymentTarget(null);
       setFirstPaymentDate('');
       setFirstPaymentDateError('');
+      updatePaymentDateMutation.reset();
     }
   }
 
@@ -226,7 +243,7 @@ export default function Installments() {
     e.preventDefault();
     createMutation.mutate({
       description: form.description,
-      totalAmount: parseFloat(form.totalAmount.replace(',', '.')),
+      totalAmount: parseCurrencyBR(form.totalAmount),
       installmentCount: parseInt(form.installmentCount),
       startDate: new Date(form.startDate + 'T12:00:00').toISOString(),
       accountId: form.accountId,
@@ -239,7 +256,7 @@ export default function Installments() {
   }
 
   function renderInstallmentCard(view: InstallmentView) {
-    const { group, paid, total, pct, installmentAmount, next, last, isFinished } = view;
+    const { group, paid, total, pct, installmentAmount, next, last, isFinished, isCancelled } = view;
 
     return (
       <div key={group.id} className="card">
@@ -266,22 +283,28 @@ export default function Installments() {
             <span
               className={clsx(
                 'rounded-pill px-2.5 py-1 text-[11.5px] font-semibold',
-                isFinished ? 'bg-income/10 text-income' : 'bg-[#E9F0EC] text-forest'
+                isCancelled
+                  ? 'bg-chip text-muted'
+                  : isFinished
+                    ? 'bg-income/10 text-income'
+                    : 'bg-[#E9F0EC] text-forest'
               )}
             >
-              {isFinished ? 'Quitado' : 'Ativo'}
+              {isCancelled ? 'Cancelado' : isFinished ? 'Finalizado' : 'Ativo'}
             </span>
-            <button
+            {!isCancelled && <button
               onClick={() => openPaymentDateModal(group)}
-              className="rounded-lg p-1.5 text-faint transition-colors hover:bg-chip hover:text-forest"
-              title="Alterar data de pagamento"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors hover:bg-chip hover:text-forest"
+              title="Alterar vencimento"
+              aria-label={`Alterar vencimento de ${group.description}`}
             >
               <Pencil size={14} />
-            </button>
+            </button>}
             <button
               onClick={() => setDeleteTarget(group)}
-              className="rounded-lg p-1.5 text-faint transition-colors hover:bg-expense/10 hover:text-expense"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors hover:bg-expense/10 hover:text-expense"
               title="Remover parcelamento"
+              aria-label={`Remover ${group.description}`}
             >
               <Trash2 size={14} />
             </button>
@@ -294,7 +317,11 @@ export default function Installments() {
         </div>
         <div className="mb-3.5 text-[12.5px] text-faint">
           Total {formatCurrency(group.totalAmount)} ·{' '}
-          {isFinished
+          {isCancelled
+            ? group.cancelledAt
+              ? `cancelado em ${formatDate(group.cancelledAt)}`
+              : 'cancelado'
+            : isFinished
             ? last
               ? `finalizado em ${formatDate(last.effectiveDate)}`
               : 'finalizado'
@@ -302,14 +329,17 @@ export default function Installments() {
         </div>
         <div className="mb-2 h-2 overflow-hidden rounded-pill bg-chip">
           <div
-            className={clsx('h-full rounded-pill transition-all', isFinished ? 'bg-income' : 'bg-forest')}
+            className={clsx(
+              'h-full rounded-pill transition-all',
+              isCancelled ? 'bg-faint' : isFinished ? 'bg-income' : 'bg-forest'
+            )}
             style={{ width: `${pct}%` }}
           />
         </div>
         <div className="flex items-center justify-between">
           <span className="text-[12.5px] font-medium text-muted">
-            Parcela {paid} de {total}
-            {!isFinished && next && ` · próxima ${formatDate(next.effectiveDate)}`}
+            {isCancelled ? `Cancelado após ${paid} de ${total} parcelas` : `Parcela ${paid} de ${total}`}
+            {!isFinished && !isCancelled && next && ` · próxima ${formatDate(next.effectiveDate)}`}
           </span>
           <span className="text-[12.5px] font-semibold text-muted">{pct}%</span>
         </div>
@@ -350,7 +380,7 @@ export default function Installments() {
                 <h2 className="text-sm font-semibold text-ink">Em andamento</h2>
                 <span className="text-xs font-medium text-faint">{ongoingInstallments.length} ativo(s)</span>
               </div>
-              <div className="grid grid-cols-1 gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
+              <div className="grid grid-cols-1 gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))' }}>
                 {ongoingInstallments.map((view) => renderInstallmentCard(view))}
               </div>
             </section>
@@ -362,13 +392,25 @@ export default function Installments() {
                 <h2 className="text-sm font-semibold text-ink">Finalizados</h2>
                 <span className="text-xs font-medium text-faint">{finishedInstallments.length} completo(s)</span>
               </div>
-              <div className="grid grid-cols-1 gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
+              <div className="grid grid-cols-1 gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))' }}>
                 {finishedInstallments.map((view) => renderInstallmentCard(view))}
               </div>
             </section>
           )}
 
-          {ongoingInstallments.length === 0 && finishedInstallments.length === 0 && (
+          {cancelledInstallments.length > 0 && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-ink">Cancelados</h2>
+                <span className="text-xs font-medium text-faint">{cancelledInstallments.length} cancelado(s)</span>
+              </div>
+              <div className="grid grid-cols-1 gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))' }}>
+                {cancelledInstallments.map((view) => renderInstallmentCard(view))}
+              </div>
+            </section>
+          )}
+
+          {ongoingInstallments.length === 0 && finishedInstallments.length === 0 && cancelledInstallments.length === 0 && (
             <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-faint">
               Nenhum parcelamento para a referência selecionada
             </div>
@@ -409,7 +451,7 @@ export default function Installments() {
           {form.totalAmount && form.installmentCount && (
             <p className="rounded-xl bg-[#E9F0EC] p-2.5 text-xs text-forest">
               {parseInt(form.installmentCount)}x de{' '}
-              {formatCurrency(parseFloat(form.totalAmount.replace(',', '.') || '0') / parseInt(form.installmentCount || '1'))}
+              {formatCurrency((parseCurrencyBR(form.totalAmount) || 0) / (parseInt(form.installmentCount) || 1))}
             </p>
           )}
           <div className="grid grid-cols-2 gap-3">
@@ -489,6 +531,7 @@ export default function Installments() {
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
             placeholder="Notas adicionais..."
           />
+          <FormError error={createMutation.error} />
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={closeModal}>Cancelar</Button>
             <Button type="submit" className="flex-1" loading={createMutation.isPending}>
@@ -511,7 +554,7 @@ export default function Installments() {
                 Escolha como remover <span className="font-semibold text-ink">{deleteTarget.description}</span>.
               </p>
               <p>
-                Remover parcelas futuras mantém as parcelas já vencidas ou pagas. Remover tudo apaga o grupo inteiro,
+                Remover parcelas futuras mantém as parcelas já ocorridas. Remover tudo apaga o grupo inteiro,
                 inclusive parcelas antigas, o que é útil quando a data inicial foi cadastrada errada.
               </p>
             </div>
@@ -522,6 +565,8 @@ export default function Installments() {
                 e {deleteTarget.transactions.filter((t) => new Date(t.effectiveDate) > today).length} futura(s).
               </p>
             </div>
+
+            <FormError error={deleteMutation.error} />
 
             <div className="flex flex-col gap-2">
               <Button
@@ -551,7 +596,7 @@ export default function Installments() {
       <Modal
         isOpen={paymentTarget !== null}
         onClose={closePaymentDateModal}
-        title="Alterar data de pagamento"
+        title="Alterar vencimento"
         size="sm"
       >
         {paymentTarget && (
@@ -575,6 +620,8 @@ export default function Installments() {
               error={firstPaymentDateError}
               required
             />
+
+            <FormError error={updatePaymentDateMutation.error} />
 
             <div className="flex gap-2 pt-2">
               <Button
