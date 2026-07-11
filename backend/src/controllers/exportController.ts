@@ -4,15 +4,21 @@ import { ptBR } from 'date-fns/locale';
 import { createObjectCsvStringifier } from 'csv-writer';
 import prisma from '../lib/prisma';
 import { ensureSubscriptionTransactions, getSubscriptionHorizon } from '../services/subscriptionService';
+import { parsePeriodQuery } from '../utils/period';
+
+function safeSpreadsheetCell(value: string) {
+  const trimmed = value.trimStart();
+  return /^[=+\-@\t\r]/.test(trimmed) ? `'${value}` : value;
+}
 
 export async function exportCSV(req: Request, res: Response, next: NextFunction) {
   try {
-    const { month, year } = req.query;
+    const { month, year } = parsePeriodQuery(req.query);
     const where: Record<string, unknown> = {};
 
-    if (month && year) {
-      const startDate = new Date(Number(year), Number(month) - 1, 1);
-      const endDate = new Date(Number(year), Number(month), 0, 23, 59, 59);
+    if (month !== undefined && year !== undefined) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0, 23, 59, 59, 999);
       where.effectiveDate = { gte: startDate, lte: endDate };
       await ensureSubscriptionTransactions(endDate);
     } else {
@@ -46,17 +52,17 @@ export async function exportCSV(req: Request, res: Response, next: NextFunction)
     const records = transactions.map((t) => ({
       date: format(t.date, 'dd/MM/yyyy', { locale: ptBR }),
       effectiveDate: format(t.effectiveDate, 'dd/MM/yyyy', { locale: ptBR }),
-      description: t.description,
-      category: t.category.name,
-      account: t.account.name,
+      description: safeSpreadsheetCell(t.description),
+      category: safeSpreadsheetCell(t.category.name),
+      account: safeSpreadsheetCell(t.account.name),
       type: t.type === 'INCOME' ? 'Receita' : 'Despesa',
       amount: t.amount.toFixed(2).replace('.', ','),
       installment: t.installmentNumber ? `${t.installmentNumber}/${t.totalInstallments}` : '',
-      subscription: t.subscription ? t.subscription.name : '',
+      subscription: t.subscription ? safeSpreadsheetCell(t.subscription.name) : '',
       thirdParty: t.isThirdParty ? 'Sim' : 'Não',
-      thirdPartyName: t.thirdPartyName ?? '',
+      thirdPartyName: t.thirdPartyName ? safeSpreadsheetCell(t.thirdPartyName) : '',
       reimbursed: t.isThirdParty ? (t.isReimbursed ? 'Sim' : 'Não') : '',
-      notes: t.notes ?? '',
+      notes: t.notes ? safeSpreadsheetCell(t.notes) : '',
     }));
 
     const csv = stringifier.getHeaderString() + stringifier.stringifyRecords(records);

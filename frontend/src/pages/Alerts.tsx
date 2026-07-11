@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Bell, BellOff } from 'lucide-react';
 import { alertsApi, categoriesApi } from '../services/api';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, parseCurrencyBR } from '../utils/formatters';
 import type { Alert, AlertPeriod } from '../types';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import FormError from '../components/ui/FormError';
 
 interface FormState {
   name: string;
@@ -73,6 +74,8 @@ export default function Alerts() {
   function openCreate() {
     setEditing(null);
     setForm(emptyForm);
+    createMutation.reset();
+    updateMutation.reset();
     setIsModalOpen(true);
   }
 
@@ -85,6 +88,8 @@ export default function Alerts() {
       period: alert.period,
       isActive: alert.isActive,
     });
+    createMutation.reset();
+    updateMutation.reset();
     setIsModalOpen(true);
   }
 
@@ -92,6 +97,8 @@ export default function Alerts() {
     setIsModalOpen(false);
     setEditing(null);
     setForm(emptyForm);
+    createMutation.reset();
+    updateMutation.reset();
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -99,7 +106,7 @@ export default function Alerts() {
     const payload = {
       name: form.name,
       categoryId: form.categoryId,
-      limitAmount: parseFloat(form.limitAmount.replace(',', '.')),
+      limitAmount: parseCurrencyBR(form.limitAmount),
       period: form.period,
       isActive: form.isActive,
     };
@@ -281,6 +288,7 @@ export default function Alerts() {
               <option value="WEEKLY">Semanal</option>
             </Select>
           </div>
+          <FormError error={createMutation.error ?? updateMutation.error} />
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={closeModal}>Cancelar</Button>
             <Button type="submit" className="flex-1" loading={createMutation.isPending || updateMutation.isPending}>
@@ -296,8 +304,12 @@ export default function Alerts() {
         description={`Excluir "${deleteTarget?.name ?? ''}"? Esta regra deixará de monitorar o limite configurado.`}
         confirmLabel="Excluir"
         loading={deleteMutation.isPending}
+        error={deleteMutation.error}
         onClose={() => {
-          if (!deleteMutation.isPending) setDeleteTarget(null);
+          if (!deleteMutation.isPending) {
+            setDeleteTarget(null);
+            deleteMutation.reset();
+          }
         }}
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget.id);

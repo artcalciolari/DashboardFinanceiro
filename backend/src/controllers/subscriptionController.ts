@@ -2,13 +2,22 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { startOfMonth } from 'date-fns';
 import prisma from '../lib/prisma';
-import { ensureSubscriptionTransactions, getSubscriptionHorizon } from '../services/subscriptionService';
+import {
+  ensureSubscriptionTransactions,
+  getSubscriptionHorizon,
+  resetSubscriptionTransactionHorizon,
+} from '../services/subscriptionService';
+import { HttpError } from '../utils/httpError';
+
+const DateString = z.string().refine((value) => !Number.isNaN(new Date(value).getTime()), {
+  message: 'Data inválida',
+});
 
 const SubscriptionSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   amount: z.number().positive('Valor deve ser positivo'),
-  startDate: z.string(),
-  endDate: z.string().nullable().optional(),
+  startDate: DateString,
+  endDate: DateString.nullable().optional(),
   billingDay: z.number().int().min(1).max(31).optional(),
   isActive: z.boolean().optional(),
   accountId: z.string(),
@@ -17,6 +26,14 @@ const SubscriptionSchema = z.object({
   thirdPartyName: z.string().nullable().optional(),
   isReimbursed: z.boolean().optional(),
   notes: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.endDate && new Date(data.endDate) < new Date(data.startDate)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['endDate'],
+      message: 'A data final deve ser posterior à data inicial',
+    });
+  }
 });
 
 function normalizeSubscriptionData(data: z.infer<typeof SubscriptionSchema>) {
@@ -62,11 +79,17 @@ export async function createSubscription(req: Request, res: Response, next: Next
   try {
     const data = normalizeSubscriptionData(SubscriptionSchema.parse(req.body));
 
+    const category = await prisma.category.findUniqueOrThrow({ where: { id: data.categoryId } });
+    if (category.type !== 'EXPENSE') {
+      throw new HttpError(422, 'Assinaturas devem usar uma categoria de despesa', 'CATEGORY_TYPE_MISMATCH');
+    }
+
     const subscription = await prisma.subscription.create({
       data,
       include: { account: true, category: true, transactions: true },
     });
 
+    resetSubscriptionTransactionHorizon();
     await ensureSubscriptionTransactions(getSubscriptionHorizon());
 
     const result = await prisma.subscription.findUnique({
@@ -88,6 +111,11 @@ export async function updateSubscription(req: Request, res: Response, next: Next
   try {
     const data = normalizeSubscriptionData(SubscriptionSchema.parse(req.body));
 
+    const category = await prisma.category.findUniqueOrThrow({ where: { id: data.categoryId } });
+    if (category.type !== 'EXPENSE') {
+      throw new HttpError(422, 'Assinaturas devem usar uma categoria de despesa', 'CATEGORY_TYPE_MISMATCH');
+    }
+
     await prisma.$transaction([
       prisma.subscription.update({
         where: { id: req.params.id },
@@ -101,6 +129,7 @@ export async function updateSubscription(req: Request, res: Response, next: Next
       }),
     ]);
 
+    resetSubscriptionTransactionHorizon();
     await ensureSubscriptionTransactions(getSubscriptionHorizon());
 
     const result = await prisma.subscription.findUnique({
@@ -133,6 +162,7 @@ export async function deleteSubscription(req: Request, res: Response, next: Next
       await tx.subscription.delete({ where: { id: req.params.id } });
     });
 
+    resetSubscriptionTransactionHorizon();
     res.status(204).send();
   } catch (err) {
     next(err);

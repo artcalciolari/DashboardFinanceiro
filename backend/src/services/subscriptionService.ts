@@ -3,6 +3,12 @@ import type { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { calculateEffectiveDate } from '../utils/creditCard';
 
+// This application runs a single personal backend instance. Serialising this
+// materialisation prevents simultaneous dashboard requests from generating the
+// same recurring occurrence before either request can see the other's insert.
+let synchronizationQueue: Promise<void> = Promise.resolve();
+let synchronizedThrough: Date | null = null;
+
 function clampDay(year: number, month: number, day: number) {
   const lastDay = new Date(year, month + 1, 0).getDate();
   return Math.min(Math.max(day, 1), lastDay);
@@ -35,7 +41,27 @@ export function getSubscriptionHorizon(monthsAhead = 12) {
   return new Date(now.getFullYear(), now.getMonth() + monthsAhead + 1, 0, 23, 59, 59);
 }
 
-export async function ensureSubscriptionTransactions(untilDate: Date) {
+export function resetSubscriptionTransactionHorizon() {
+  synchronizedThrough = null;
+}
+
+export function ensureSubscriptionTransactions(untilDate: Date) {
+  const requestedThrough = endOfDay(untilDate);
+  const task = synchronizationQueue.then(async () => {
+    if (synchronizedThrough && requestedThrough <= synchronizedThrough) return;
+
+    await synchronizeSubscriptionTransactions(requestedThrough);
+    synchronizedThrough = requestedThrough;
+  });
+
+  // Keep the queue usable after an error while still returning the failure to
+  // the request that triggered it.
+  synchronizationQueue = task.catch(() => undefined);
+  return task;
+}
+
+async function synchronizeSubscriptionTransactions(untilDate: Date) {
+  const mutableFrom = new Date(new Date().getFullYear(), new Date().getMonth(), 1, 0, 0, 0, 0);
   const subscriptions = await prisma.subscription.findMany({
     where: {
       isActive: true,
@@ -112,6 +138,13 @@ export async function ensureSubscriptionTransactions(untilDate: Date) {
         const existingTransaction = existingTransactionsByKey.get(key);
 
         if (existingTransaction) {
+          // A subscription edit should never silently rewrite an already closed
+          // month. Future/current occurrences are still recalculated below.
+          if (existingTransaction.effectiveDate < mutableFrom) {
+            cursor = addMonths(cursor, 1);
+            continue;
+          }
+
           const updateData: Prisma.TransactionUpdateInput = {};
 
           if (existingTransaction.date.getTime() !== purchaseDate.getTime()) {

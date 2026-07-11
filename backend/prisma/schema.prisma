@@ -99,6 +99,8 @@ model InstallmentGroup {
   isThirdParty     Boolean  @default(false)
   thirdPartyName   String?
   isReimbursed     Boolean  @default(false)
+  isCancelled      Boolean  @default(false)
+  cancelledAt      DateTime?
 
   accountId  String
   account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)

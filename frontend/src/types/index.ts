@@ -61,6 +61,8 @@ export interface InstallmentGroup {
   isThirdParty: boolean;
   thirdPartyName?: string | null;
   isReimbursed: boolean;
+  isCancelled: boolean;
+  cancelledAt?: string | null;
   accountId: string;
   account: Account;
   categoryId: string;

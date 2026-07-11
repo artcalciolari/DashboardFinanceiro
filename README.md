@@ -11,7 +11,7 @@ Este projeto tem foco em portfólio e uso pessoal. A proposta é demonstrar uma 
 - Cadastro de categorias com cores, ícones e limites de alerta.
 - Registro de despesas, receitas, recorrências e parcelamentos.
 - Alertas configuráveis para acompanhar limites definidos.
-- Exportação de informações financeiras em CSV e PDF.
+- Exportação de informações financeiras em CSV.
 - Interface responsiva em React, com componentes reutilizáveis e estados de carregamento.
 - API em Node.js com TypeScript, validação de entrada e rotas organizadas por domínio.
 - Ambiente conteinerizado para execução local consistente.
@@ -44,8 +44,12 @@ API: http://localhost:3001
 Backend:
 
 ```bash
+# Inicie somente o banco com Docker (uma vez por sessão):
+docker compose up -d postgres
+
 cd backend
 npm install
+npx prisma db push
 npm run dev
 ```
 
@@ -58,6 +62,8 @@ npm run dev
 ```
 
 Frontend disponível em desenvolvimento: http://localhost:5173
+
+O backend usa as variáveis `DB_USER`, `DB_PASSWORD` e `DB_NAME` do `.env` na raiz para montar a conexão local. Se preferir, defina `DATABASE_URL` diretamente.
 
 ## Estrutura
 

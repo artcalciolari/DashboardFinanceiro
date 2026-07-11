@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, CreditCard, Building2, Wallet, TrendingUp } from 'lucide-react';
 import { accountsApi } from '../services/api';
-import { formatCurrency, ACCOUNT_TYPE_LABELS } from '../utils/formatters';
+import { formatCurrency, parseCurrencyBR, ACCOUNT_TYPE_LABELS } from '../utils/formatters';
 import type { Account, AccountType } from '../types';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -10,6 +10,7 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import ColorPicker from '../components/ui/ColorPicker';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import FormError from '../components/ui/FormError';
 
 const ACCOUNT_ICONS: Record<AccountType, typeof CreditCard> = {
   CREDIT_CARD: CreditCard,
@@ -98,6 +99,8 @@ export default function Accounts() {
     setIsModalOpen(false);
     setEditing(null);
     setForm(emptyForm);
+    createMutation.reset();
+    updateMutation.reset();
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -105,11 +108,11 @@ export default function Accounts() {
     const payload = {
       name: form.name,
       type: form.type,
-      balance: form.type === 'CREDIT_CARD' ? 0 : parseFloat(form.balance.replace(',', '.')),
+      balance: form.type === 'CREDIT_CARD' ? 0 : parseCurrencyBR(form.balance),
       color: form.color,
       creditLimit:
         form.type === 'CREDIT_CARD' && form.creditLimit
-          ? parseFloat(form.creditLimit.replace(',', '.'))
+          ? parseCurrencyBR(form.creditLimit)
           : null,
       closingDay: form.closingDay ? parseInt(form.closingDay) : null,
       dueDay: form.dueDay ? parseInt(form.dueDay) : null,
@@ -301,6 +304,8 @@ export default function Accounts() {
             onChange={(color) => setForm({ ...form, color })}
           />
 
+          <FormError error={createMutation.error ?? updateMutation.error} />
+
           <div className="flex gap-2 pt-2">
             <Button type="button" variant="secondary" className="flex-1" onClick={closeModal}>
               Cancelar
@@ -322,8 +327,12 @@ export default function Accounts() {
         description={`Excluir "${deleteTarget?.name ?? ''}"? Todas as transações associadas também serão removidas.`}
         confirmLabel="Excluir"
         loading={deleteMutation.isPending}
+        error={deleteMutation.error}
         onClose={() => {
-          if (!deleteMutation.isPending) setDeleteTarget(null);
+          if (!deleteMutation.isPending) {
+            setDeleteTarget(null);
+            deleteMutation.reset();
+          }
         }}
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget.id);

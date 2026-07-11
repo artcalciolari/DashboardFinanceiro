@@ -11,7 +11,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       {/* Main content area, offset by sidebar on desktop */}
       <div className="md:ml-[250px] flex flex-col min-h-screen">
         <Header />
-        <main className="flex-1 p-7 pb-24 md:pb-12 animate-[sc-rise_.4s_ease_both]">{children}</main>
+        <main className="flex-1 p-4 pb-24 sm:p-6 md:p-7 md:pb-12 animate-[sc-rise_.4s_ease_both]">{children}</main>
       </div>
 
       <TransactionFormModal />

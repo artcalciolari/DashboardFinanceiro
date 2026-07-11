@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
+import { resetSubscriptionTransactionHorizon } from '../services/subscriptionService';
 
 const AccountSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -61,6 +62,17 @@ export async function updateAccount(req: Request, res: Response, next: NextFunct
       where: { id: req.params.id },
       data: normalizeAccountData(data, accountType),
     });
+
+    // Fechamento/vencimento alteram a effectiveDate das cobranças futuras de
+    // assinatura; sem o reset, o cache de horizonte impede o recálculo.
+    if (
+      account.type !== existing.type ||
+      account.closingDay !== existing.closingDay ||
+      account.dueDay !== existing.dueDay
+    ) {
+      resetSubscriptionTransactionHorizon();
+    }
+
     res.json(account);
   } catch (err) {
     next(err);

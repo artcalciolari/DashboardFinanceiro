@@ -17,7 +17,18 @@ const BASE_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
   : '/api';
 
-const api = axios.create({ baseURL: BASE_URL });
+const api = axios.create({ baseURL: BASE_URL, timeout: 12_000 });
+
+export function getApiErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const message = error.response?.data?.message;
+    if (typeof message === 'string') return message;
+    if (error.code === 'ECONNABORTED') return 'A solicitação demorou demais. Tente novamente.';
+    if (!error.response) return 'Não foi possível conectar ao servidor.';
+  }
+
+  return 'Não foi possível concluir a operação. Tente novamente.';
+}
 
 // ─── Accounts ────────────────────────────────────────────────────────────────
 

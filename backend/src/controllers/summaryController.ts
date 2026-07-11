@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import prisma from '../lib/prisma';
 import { ensureSubscriptionTransactions } from '../services/subscriptionService';
+import { parsePeriodQuery } from '../utils/period';
 
 function getPeriodDates(month: number, year: number) {
   const startDate = new Date(year, month - 1, 1);
@@ -11,8 +12,9 @@ function getPeriodDates(month: number, year: number) {
 export async function getMonthlySummary(req: Request, res: Response, next: NextFunction) {
   try {
     const now = new Date();
-    const month = req.query.month ? Number(req.query.month) : now.getMonth() + 1;
-    const year = req.query.year ? Number(req.query.year) : now.getFullYear();
+    const period = parsePeriodQuery(req.query);
+    const month = period.month ?? now.getMonth() + 1;
+    const year = period.year ?? now.getFullYear();
     const { startDate, endDate } = getPeriodDates(month, year);
 
     await ensureSubscriptionTransactions(endDate);
@@ -54,8 +56,9 @@ export async function getMonthlySummary(req: Request, res: Response, next: NextF
 export async function getCategorySummary(req: Request, res: Response, next: NextFunction) {
   try {
     const now = new Date();
-    const month = req.query.month ? Number(req.query.month) : now.getMonth() + 1;
-    const year = req.query.year ? Number(req.query.year) : now.getFullYear();
+    const period = parsePeriodQuery(req.query);
+    const month = period.month ?? now.getMonth() + 1;
+    const year = period.year ?? now.getFullYear();
     const { startDate, endDate } = getPeriodDates(month, year);
 
     await ensureSubscriptionTransactions(endDate);
@@ -87,14 +90,15 @@ export async function getMonthlyEvolution(req: Request, res: Response, next: Nex
     const now = new Date();
     const result = [];
 
+    const { endDate } = getPeriodDates(now.getMonth() + 1, now.getFullYear());
+    await ensureSubscriptionTransactions(endDate);
+
     for (let i = months - 1; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const { startDate, endDate } = getPeriodDates(
         date.getMonth() + 1,
         date.getFullYear()
       );
-
-      await ensureSubscriptionTransactions(endDate);
 
       const transactions = await prisma.transaction.findMany({
         where: { effectiveDate: { gte: startDate, lte: endDate } },
@@ -125,8 +129,9 @@ export async function getMonthlyEvolution(req: Request, res: Response, next: Nex
 export async function getAccountSummary(req: Request, res: Response, next: NextFunction) {
   try {
     const now = new Date();
-    const month = req.query.month ? Number(req.query.month) : now.getMonth() + 1;
-    const year = req.query.year ? Number(req.query.year) : now.getFullYear();
+    const period = parsePeriodQuery(req.query);
+    const month = period.month ?? now.getMonth() + 1;
+    const year = period.year ?? now.getFullYear();
     const { startDate, endDate } = getPeriodDates(month, year);
 
     await ensureSubscriptionTransactions(endDate);

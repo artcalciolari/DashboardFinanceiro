@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Pencil, Trash2 } from 'lucide-react';
-import { transactionsApi } from '../services/api';
+import { transactionsApi, getApiErrorMessage } from '../services/api';
 import { useDate } from '../context/DateContext';
 import { useSearch } from '../context/SearchContext';
 import { useTransactionModal } from '../context/TransactionModalContext';
@@ -22,7 +22,7 @@ export default function Transactions() {
   const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
 
-  const { data: transactions = [], isLoading } = useQuery({
+  const { data: transactions = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['transactions', month, year],
     queryFn: () => transactionsApi.getAll({ month, year }),
   });
@@ -106,7 +106,15 @@ export default function Transactions() {
       </div>
 
       <div className="overflow-hidden rounded-card border border-border bg-card">
-        {isLoading ? (
+        {isError ? (
+          <div className="px-6 py-16 text-center">
+            <h3 className="font-display text-[17px] font-semibold text-ink">Não foi possível carregar as transações</h3>
+            <p className="mt-1.5 text-[13.5px] text-faint">{getApiErrorMessage(error)}</p>
+            <Button variant="secondary" size="sm" className="mt-4" onClick={() => refetch()}>
+              Tentar novamente
+            </Button>
+          </div>
+        ) : isLoading ? (
           <div className="p-8 text-center text-faint">Carregando...</div>
         ) : filtered.length === 0 ? (
           <div className="px-6 py-16 text-center">
@@ -166,22 +174,26 @@ export default function Transactions() {
                   </div>
                   <div className="mt-0.5 text-xs text-faint">{formatDate(t.effectiveDate)}</div>
                 </div>
-                <div className="flex flex-shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                {!t.installmentGroupId && !t.subscriptionId && (
+                <div className="flex flex-shrink-0 gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
                   <button
                     onClick={() => openEdit(t)}
-                    className="rounded-lg p-1.5 text-faint transition-colors hover:bg-chip hover:text-forest"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors hover:bg-chip hover:text-forest"
                     title="Editar transação"
+                    aria-label={`Editar ${t.description}`}
                   >
                     <Pencil size={14} />
                   </button>
                   <button
                     onClick={() => setDeleteTarget(t)}
-                    className="rounded-lg p-1.5 text-faint transition-colors hover:bg-expense/10 hover:text-expense"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-faint transition-colors hover:bg-expense/10 hover:text-expense"
                     title="Excluir transação"
+                    aria-label={`Excluir ${t.description}`}
                   >
                     <Trash2 size={14} />
                   </button>
                 </div>
+                )}
               </div>
             ))}
           </div>
@@ -194,8 +206,12 @@ export default function Transactions() {
         description={`Excluir "${deleteTarget?.description ?? ''}"? Esta ação remove a movimentação deste mês.`}
         confirmLabel="Excluir"
         loading={deleteMutation.isPending}
+        error={deleteMutation.error}
         onClose={() => {
-          if (!deleteMutation.isPending) setDeleteTarget(null);
+          if (!deleteMutation.isPending) {
+            setDeleteTarget(null);
+            deleteMutation.reset();
+          }
         }}
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget.id);

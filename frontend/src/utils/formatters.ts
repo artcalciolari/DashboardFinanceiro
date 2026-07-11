@@ -13,6 +13,31 @@ export function formatDate(dateStr: string): string {
   return format(parseISO(dateStr), 'dd/MM/yyyy', { locale: ptBR });
 }
 
+/**
+ * Converte valores digitados/colados em número, aceitando tanto o formato
+ * pt-BR ("1.234,56") quanto o canônico dos inputs numéricos ("1234.56").
+ * O separador decimal é o que aparece por último; os demais são milhar.
+ */
+export function parseCurrencyBR(value: string): number {
+  const cleaned = value.trim().replace(/[^\d.,-]/g, '');
+  if (!cleaned) return NaN;
+
+  const lastComma = cleaned.lastIndexOf(',');
+  const lastDot = cleaned.lastIndexOf('.');
+
+  if (lastComma > lastDot) {
+    const intPart = cleaned.slice(0, lastComma).replace(/[.,]/g, '');
+    return parseFloat(`${intPart}.${cleaned.slice(lastComma + 1)}`);
+  }
+
+  return parseFloat(cleaned.replace(/,/g, ''));
+}
+
+export function getLocalDateInput(date = new Date()): string {
+  const timezoneOffsetMs = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - timezoneOffsetMs).toISOString().slice(0, 10);
+}
+
 export function formatMonthYear(month: number, year: number): string {
   const date = new Date(year, month - 1, 1);
   return capitalize(format(date, 'MMMM yyyy', { locale: ptBR }));

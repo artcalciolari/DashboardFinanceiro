@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import prisma from '../lib/prisma';
 import { ensureSubscriptionTransactions } from '../services/subscriptionService';
+import { HttpError } from '../utils/httpError';
 
 const AlertSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -11,6 +12,13 @@ const AlertSchema = z.object({
   period: z.enum(['MONTHLY', 'WEEKLY']),
   isActive: z.boolean().optional(),
 });
+
+async function ensureExpenseCategory(categoryId: string) {
+  const category = await prisma.category.findUniqueOrThrow({ where: { id: categoryId } });
+  if (category.type !== 'EXPENSE') {
+    throw new HttpError(422, 'Alertas devem usar uma categoria de despesa', 'CATEGORY_TYPE_MISMATCH');
+  }
+}
 
 export async function getAlerts(req: Request, res: Response, next: NextFunction) {
   try {
@@ -27,6 +35,7 @@ export async function getAlerts(req: Request, res: Response, next: NextFunction)
 export async function createAlert(req: Request, res: Response, next: NextFunction) {
   try {
     const data = AlertSchema.parse(req.body);
+    await ensureExpenseCategory(data.categoryId);
     const alert = await prisma.alert.create({ data, include: { category: true } });
     res.status(201).json(alert);
   } catch (err) {
@@ -37,6 +46,7 @@ export async function createAlert(req: Request, res: Response, next: NextFunctio
 export async function updateAlert(req: Request, res: Response, next: NextFunction) {
   try {
     const data = AlertSchema.partial().parse(req.body);
+    if (data.categoryId) await ensureExpenseCategory(data.categoryId);
     const alert = await prisma.alert.update({
       where: { id: req.params.id },
       data,
