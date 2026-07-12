@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Pencil, Trash2 } from 'lucide-react';
-import { transactionsApi, getApiErrorMessage } from '../services/api';
+import { Search, Pencil, Trash2, SlidersHorizontal, X } from 'lucide-react';
+import { transactionsApi, accountsApi, categoriesApi, getApiErrorMessage } from '../services/api';
 import { useDate } from '../context/DateContext';
 import { useSearch } from '../context/SearchContext';
 import { useTransactionModal } from '../context/TransactionModalContext';
@@ -12,6 +12,15 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { clsx } from 'clsx';
 
 type TypeFilter = 'all' | 'INCOME' | 'EXPENSE';
+type OriginFilter = 'all' | 'single' | 'installment' | 'subscription' | 'thirdParty';
+
+const originOptions: { key: OriginFilter; label: string }[] = [
+  { key: 'all', label: 'Todas as origens' },
+  { key: 'single', label: 'Lançamentos avulsos' },
+  { key: 'installment', label: 'Parcelas' },
+  { key: 'subscription', label: 'Assinaturas' },
+  { key: 'thirdParty', label: 'De terceiros' },
+];
 
 export default function Transactions() {
   const { month, year } = useDate();
@@ -21,11 +30,18 @@ export default function Transactions() {
 
   const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [accountFilter, setAccountFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [originFilter, setOriginFilter] = useState<OriginFilter>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   const { data: transactions = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['transactions', month, year],
     queryFn: () => transactionsApi.getAll({ month, year }),
   });
+
+  const { data: accounts = [] } = useQuery({ queryKey: ['accounts'], queryFn: accountsApi.getAll });
+  const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: categoriesApi.getAll });
 
   const deleteMutation = useMutation({
     mutationFn: transactionsApi.delete,
@@ -39,22 +55,51 @@ export default function Transactions() {
   const q = search.trim().toLowerCase();
   const filtered = transactions.filter((t) => {
     const okType = typeFilter === 'all' || t.type === typeFilter;
+    const okAccount = accountFilter === 'all' || t.accountId === accountFilter;
+    const okCategory = categoryFilter === 'all' || t.categoryId === categoryFilter;
+    const okOrigin =
+      originFilter === 'all' ||
+      (originFilter === 'single' && !t.installmentGroupId && !t.subscriptionId) ||
+      (originFilter === 'installment' && !!t.installmentGroupId) ||
+      (originFilter === 'subscription' && !!t.subscriptionId) ||
+      (originFilter === 'thirdParty' && t.isThirdParty);
     const okSearch =
       !q ||
       t.description.toLowerCase().includes(q) ||
       t.category.name.toLowerCase().includes(q) ||
       t.account.name.toLowerCase().includes(q);
-    return okType && okSearch;
+    return okType && okAccount && okCategory && okOrigin && okSearch;
   });
 
   const sumIncome = filtered.filter((t) => t.type === 'INCOME').reduce((s, t) => s + t.amount, 0);
   const sumExpense = filtered.filter((t) => t.type === 'EXPENSE').reduce((s, t) => s + t.amount, 0);
-  const hasActiveFilters = typeFilter !== 'all' || q.length > 0;
+  const advancedFilterCount =
+    (accountFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (originFilter !== 'all' ? 1 : 0);
+  const hasActiveFilters = typeFilter !== 'all' || q.length > 0 || advancedFilterCount > 0;
 
   function resetFilters() {
     setTypeFilter('all');
+    setAccountFilter('all');
+    setCategoryFilter('all');
+    setOriginFilter('all');
     setSearch('');
   }
+
+  function selectType(type: TypeFilter) {
+    setTypeFilter(type);
+    // categoria de tipo oposto nunca teria resultados — solta o filtro
+    if (type !== 'all' && categoryFilter !== 'all') {
+      const selected = categories.find((c) => c.id === categoryFilter);
+      if (selected && selected.type !== type) setCategoryFilter('all');
+    }
+  }
+
+  const visibleCategories = typeFilter === 'all' ? categories : categories.filter((c) => c.type === typeFilter);
+  const incomeCategories = visibleCategories.filter((c) => c.type === 'INCOME');
+  const expenseCategories = visibleCategories.filter((c) => c.type === 'EXPENSE');
+
+  const selectClass =
+    'h-9 rounded-lg border border-border bg-white px-3 pr-8 text-[13px] font-medium text-ink outline-none transition-shadow focus:border-forest focus:shadow-focus-forest';
 
   const segments: { key: TypeFilter; label: string }[] = [
     { key: 'all', label: 'Todas' },
@@ -74,20 +119,42 @@ export default function Transactions() {
       </div>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="inline-flex gap-0.5 rounded-xl bg-[#EDEAE0] p-1">
-          {segments.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              onClick={() => setTypeFilter(s.key)}
-              className={clsx(
-                'rounded-[9px] px-4 py-1.5 text-[13px] font-semibold transition-colors',
-                typeFilter === s.key ? 'bg-white text-forest shadow-sm' : 'bg-transparent text-muted font-medium'
-              )}
-            >
-              {s.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex gap-0.5 rounded-xl bg-[#EDEAE0] p-1">
+            {segments.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => selectType(s.key)}
+                className={clsx(
+                  'rounded-[9px] px-4 py-1.5 text-[13px] font-semibold transition-colors',
+                  typeFilter === s.key ? 'bg-white text-forest shadow-sm' : 'bg-transparent text-muted font-medium'
+                )}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFilters((v) => !v)}
+            aria-expanded={showFilters}
+            aria-controls="transaction-filters"
+            className={clsx(
+              'inline-flex h-[38px] items-center gap-2 rounded-xl border px-3.5 text-[13px] font-semibold transition-colors',
+              showFilters || advancedFilterCount > 0
+                ? 'border-forest/30 bg-white text-forest shadow-sm'
+                : 'border-transparent bg-[#EDEAE0] text-muted hover:text-ink'
+            )}
+          >
+            <SlidersHorizontal size={14} />
+            Filtros
+            {advancedFilterCount > 0 && (
+              <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-forest px-1 text-[11px] font-bold text-white">
+                {advancedFilterCount}
+              </span>
+            )}
+          </button>
         </div>
         <div className="flex gap-6">
           <div className="text-right">
@@ -104,6 +171,96 @@ export default function Transactions() {
           </div>
         </div>
       </div>
+
+      {showFilters && (
+        <div
+          id="transaction-filters"
+          className="mb-4 flex flex-wrap items-end gap-3 rounded-card border border-border bg-card px-4 py-3.5"
+        >
+          <div className="flex min-w-[180px] flex-1 flex-col gap-1.5 sm:max-w-[240px]">
+            <label htmlFor="filter-account" className="text-[11.5px] font-semibold text-muted">
+              Conta
+            </label>
+            <select
+              id="filter-account"
+              value={accountFilter}
+              onChange={(e) => setAccountFilter(e.target.value)}
+              className={selectClass}
+            >
+              <option value="all">Todas as contas</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex min-w-[180px] flex-1 flex-col gap-1.5 sm:max-w-[240px]">
+            <label htmlFor="filter-category" className="text-[11.5px] font-semibold text-muted">
+              Categoria
+            </label>
+            <select
+              id="filter-category"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className={selectClass}
+            >
+              <option value="all">Todas as categorias</option>
+              {typeFilter === 'all' ? (
+                <>
+                  <optgroup label="Receitas">
+                    {incomeCategories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Despesas">
+                    {expenseCategories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                </>
+              ) : (
+                visibleCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+          <div className="flex min-w-[180px] flex-1 flex-col gap-1.5 sm:max-w-[240px]">
+            <label htmlFor="filter-origin" className="text-[11.5px] font-semibold text-muted">
+              Origem
+            </label>
+            <select
+              id="filter-origin"
+              value={originFilter}
+              onChange={(e) => setOriginFilter(e.target.value as OriginFilter)}
+              className={selectClass}
+            >
+              {originOptions.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-muted transition-colors hover:bg-chip hover:text-ink"
+            >
+              <X size={14} />
+              Limpar filtros
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-card border border-border bg-card">
         {isError ? (

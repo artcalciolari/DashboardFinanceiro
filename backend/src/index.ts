@@ -32,16 +32,27 @@ const allowedOrigins = (process.env.CORS_ORIGIN?.split(',') ?? defaultOrigins)
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+// Requisições que chegam pelo proxy do nginx são same-origin: o Origin do
+// browser bate com o Host encaminhado, qualquer que seja o IP/domínio usado.
+function isAllowedOrigin(origin: string | undefined, req: express.Request): boolean {
+  if (!origin || allowedOrigins.includes(origin)) return true;
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  const proto = typeof forwardedProto === 'string' ? forwardedProto.split(',')[0].trim() : req.protocol;
+  return origin === `${proto}://${req.headers.host}`;
+}
+
 app.use(helmet());
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-      return;
-    }
-    callback(new HttpError(403, 'Origem não permitida', 'CORS_ORIGIN_DENIED'));
-  },
-}));
+app.use((req, res, next) => {
+  cors({
+    origin(origin, callback) {
+      if (isAllowedOrigin(origin, req)) {
+        callback(null, true);
+        return;
+      }
+      callback(new HttpError(403, 'Origem não permitida', 'CORS_ORIGIN_DENIED'));
+    },
+  })(req, res, next);
+});
 app.use(express.json());
 
 app.use('/api', router);

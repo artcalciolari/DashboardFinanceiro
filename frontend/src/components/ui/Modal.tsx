@@ -15,11 +15,16 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
   const titleId = useId();
 
   useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
 
       if (e.key === 'Tab' && dialogRef.current) {
         const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
@@ -45,14 +50,20 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     document.addEventListener('keydown', handleKeyDown);
     requestAnimationFrame(() => {
-      dialogRef.current?.querySelector<HTMLElement>('input, select, textarea, button')?.focus();
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      // Foca o primeiro campo do conteúdo; o botão X do cabeçalho fica por último.
+      const target =
+        dialog.querySelector<HTMLElement>('input, select, textarea') ??
+        dialog.querySelector<HTMLElement>('button');
+      (target ?? dialog).focus();
     });
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       previousFocusRef.current?.focus();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? 'hidden' : '';
