@@ -210,7 +210,7 @@ export default function TransactionFormModal() {
           </Select>
         </div>
         <Input
-          label="Data da compra"
+          label={form.type === 'INCOME' ? 'Data do recebimento' : 'Data da compra'}
           type="date"
           value={form.date}
           onChange={(e) => setForm({ ...form, date: e.target.value })}
