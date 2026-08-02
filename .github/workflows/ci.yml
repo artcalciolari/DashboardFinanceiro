@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -48,6 +48,10 @@ jobs:
         working-directory: backend
       - run: pnpm run test:integration
         working-directory: backend
+      - run: pnpm run test:coverage
+        working-directory: backend
+      - run: pnpm run test:coverage
+        working-directory: frontend
       - run: pnpm run build
         working-directory: backend
       - run: pnpm run build
