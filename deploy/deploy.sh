@@ -32,11 +32,6 @@ if [[ ! -f "$DEPLOY_DIR/.env" ]]; then
   exit 1
 fi
 
-if [[ ! -s "$DEPLOY_DIR/deploy/.htpasswd" ]]; then
-  echo "Missing production Basic Auth file: $DEPLOY_DIR/deploy/.htpasswd" >&2
-  exit 1
-fi
-
 if ! docker inspect "$DB_CONTAINER" >/dev/null 2>&1; then
   echo "Database container $DB_CONTAINER does not exist" >&2
   exit 1
@@ -44,9 +39,6 @@ fi
 
 mkdir -p "$DEPLOY_DIR/backups" "$DEPLOY_DIR/deploy"
 chmod 600 "$DEPLOY_DIR/.env"
-# The bind-mounted file keeps host ownership. Nginx workers must be able to
-# read its bcrypt hashes; production credentials themselves are not stored here.
-chmod 644 "$DEPLOY_DIR/deploy/.htpasswd"
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 revision="${GITHUB_SHA:-manual}"
@@ -113,7 +105,6 @@ rsync -a \
   --exclude='.claude/' \
   --exclude='.env' \
   --exclude='backups/' \
-  --exclude='deploy/.htpasswd' \
   --exclude='node_modules/' \
   --exclude='dist/' \
   "$SOURCE_DIR/" "$DEPLOY_DIR/"
@@ -153,11 +144,10 @@ web_stopped=0
 
 docker exec "$BACKEND_CONTAINER" node -e \
   "fetch('http://127.0.0.1:3001/health/ready').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"
-docker exec --user nginx "$FRONTEND_CONTAINER" test -r /etc/nginx/.htpasswd
 
 http_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' http://127.0.0.1/)"
-if [[ "$http_status" != "401" ]]; then
-  echo "Expected authenticated frontend to return 401 without credentials; got $http_status" >&2
+if [[ "$http_status" != "200" ]]; then
+  echo "Expected frontend to return 200; got $http_status" >&2
   exit 1
 fi
 

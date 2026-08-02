@@ -72,21 +72,18 @@ Frontend disponível em desenvolvimento: http://localhost:5173
 
 O backend usa as variáveis `DB_USER`, `DB_PASSWORD` e `DB_NAME` do `.env` na raiz para montar a conexão local. Se preferir, defina `DATABASE_URL` diretamente. A regra de datas usa `BUSINESS_TIME_ZONE=America/Sao_Paulo` por padrão.
 
-## Segurança e acesso remoto
+## Acesso remoto (opcional)
 
-Não altere `DASHBOARD_BIND_ADDRESS` enquanto a aplicação for apenas local. Para
-publicar por meio de um proxy TLS externo, crie primeiro o arquivo de senhas:
+Por padrão o Compose publica o frontend só em `127.0.0.1`. Para expor na LAN ou
+atrás de um proxy TLS externo, use o override remoto (porta 80 no host):
 
 ```bash
-mkdir -p deploy
-docker run --rm -it httpd:2.4-alpine htpasswd -nB dashboard > deploy/.htpasswd
 docker compose -f docker-compose.yml -f docker-compose.remote.yml up -d
 ```
 
-O override protege tanto a interface quanto `/api` com Basic Auth. Ele deve ficar
-atrás de HTTPS; Basic Auth sozinho não cifra a conexão. O arquivo `.htpasswd` é
-ignorado pelo Git. Para aceitar conexões de um proxy instalado em outra máquina,
-configure `DASHBOARD_BIND_ADDRESS` deliberadamente e restrinja a porta no firewall.
+Configure `DASHBOARD_BIND_ADDRESS` no `.env` (por exemplo `0.0.0.0`) e restrinja
+a porta no firewall. Não há login na aplicação — proteja o acesso na rede ou no
+proxy, se necessário.
 
 ## Deploy automatizado
 
@@ -100,7 +97,6 @@ Antes do primeiro deploy, o servidor precisa ter:
 - runner GitHub Actions registrado para este repositório e executado pelo
   usuário com acesso ao Docker;
 - `/home/arthur/dashboard-financeiro/.env`;
-- `/home/arthur/dashboard-financeiro/deploy/.htpasswd`;
 - stack atual com o banco `financeiro_db` disponível.
 
 Cada execução cria e valida um backup custom-format em
