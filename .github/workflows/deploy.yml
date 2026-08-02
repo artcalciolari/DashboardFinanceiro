@@ -1,4 +1,4 @@
-name: Deploy production
+﻿name: Deploy production
 
 on:
   workflow_run:
@@ -28,7 +28,7 @@ jobs:
       COMPOSE_PROJECT_NAME: dashboard-financeiro
     steps:
       - name: Check out verified revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
