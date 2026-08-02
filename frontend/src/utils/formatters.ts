@@ -1,4 +1,4 @@
-import { format, parseISO } from 'date-fns';
+﻿import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { AccountType, CategoryType } from '../types';
 
@@ -68,6 +68,29 @@ export function formatMonthShort(month: number, year: number): string {
 
 export function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/** Valor da parcela para preview do formulário (centavos → BRL via formatCurrency). */
+export function installmentPreviewCents(totalAmount: string, installmentCount: string): number {
+  return (parseCurrencyBR(totalAmount) || 0) / (parseInt(installmentCount, 10) || 1);
+}
+
+/** Amplitude do sparkline (evita divisão por zero quando a série é plana). */
+export function sparkChartRange(sparkMin: number, sparkMax: number): number {
+  const range = sparkMax - sparkMin;
+  return range === 0 ? 1 : range;
+}
+
+/** Coordenada X do sparkline (ponto único fica em x=0). */
+export function sparkChartX(index: number, count: number): number {
+  if (count <= 1) return 0;
+  return (index / (count - 1)) * 260;
+}
+
+/** Valor KPI do resumo mensal. */
+export function formatSummaryAmount(isLoading: boolean, cents: number | undefined): string {
+  if (isLoading) return '—';
+  return formatCurrency(cents ?? 0);
 }
 
 export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, CreditCard, Building2, Wallet, TrendingUp } from 'lucide-react';
 import { accountsApi } from '../services/api';
@@ -157,7 +157,6 @@ export default function Accounts() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {accounts.map((account) => {
             const Icon = ACCOUNT_ICONS[account.type];
-            const positive = account.type !== 'CREDIT_CARD';
             return (
               <div key={account.id} className="card">
                 <div className="flex items-start justify-between">
@@ -212,7 +211,7 @@ export default function Accounts() {
                       </p>
                       <p
                         className="tabular mt-0.5 font-display text-[26px] font-bold tracking-tight"
-                        style={{ color: positive ? '#0F7A52' : undefined }}
+                        style={{ color: '#0F7A52' }}
                       >
                         {formatCurrency(account.openingBalanceCents)}
                       </p>
@@ -335,7 +334,7 @@ export default function Accounts() {
           }
         }}
         onConfirm={() => {
-          if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+          deleteMutation.mutate(deleteTarget!.id);
         }}
       />
     </div>

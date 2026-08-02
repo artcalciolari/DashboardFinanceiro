@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from 'react';
+﻿import { useDeferredValue, useMemo, useState } from 'react';
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Pencil, Trash2, SlidersHorizontal, X } from 'lucide-react';
 import { transactionsApi, accountsApi, categoriesApi, getApiErrorMessage } from '../services/api';
@@ -381,7 +381,7 @@ export default function Transactions() {
           }
         }}
         onConfirm={() => {
-          if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+          deleteMutation.mutate(deleteTarget!.id);
         }}
       />
     </div>

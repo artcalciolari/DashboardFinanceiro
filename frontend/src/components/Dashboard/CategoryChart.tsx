@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+﻿import { useQuery } from '@tanstack/react-query';
 import { summaryApi } from '../../services/api';
 import { useDate } from '../../context/DateContext';
 import { formatCurrency } from '../../utils/formatters';
@@ -53,7 +53,7 @@ export default function CategoryChart() {
                 <div
                   className="h-full rounded-pill transition-all"
                   style={{
-                    width: `${maxValue > 0 ? Math.round((item.totalCents / maxValue) * 100) : 0}%`,
+                    width: `${Math.round((item.totalCents / maxValue) * 100)}%`,
                     backgroundColor: item.category.color,
                   }}
                 />

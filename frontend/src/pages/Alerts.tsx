@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Bell, BellOff } from 'lucide-react';
 import { alertsApi, categoriesApi } from '../services/api';
@@ -312,7 +312,7 @@ export default function Alerts() {
           }
         }}
         onConfirm={() => {
-          if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+          deleteMutation.mutate(deleteTarget!.id);
         }}
       />
     </div>
