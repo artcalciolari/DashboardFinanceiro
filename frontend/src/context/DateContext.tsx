@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+﻿import { createContext, useContext, useState, ReactNode } from 'react';
 
 interface DateContextType {
   month: number;
@@ -16,9 +16,17 @@ const DateContext = createContext<DateContextType>({
   setYear: () => {},
 });
 
-export function DateProvider({ children }: { children: ReactNode }) {
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [year, setYear] = useState(now.getFullYear());
+export function DateProvider({
+  children,
+  initialMonth = now.getMonth() + 1,
+  initialYear = now.getFullYear(),
+}: {
+  children: ReactNode;
+  initialMonth?: number;
+  initialYear?: number;
+}) {
+  const [month, setMonth] = useState(initialMonth);
+  const [year, setYear] = useState(initialYear);
 
   return (
     <DateContext.Provider value={{ month, year, setMonth, setYear }}>

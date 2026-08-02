@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+﻿import { createContext, useCallback, useContext, useMemo, useState, ReactNode } from 'react';
 import type { Transaction } from '../types';
 
 interface TransactionModalContextType {
@@ -21,23 +21,28 @@ export function TransactionModalProvider({ children }: { children: ReactNode }) 
   const [isOpen, setIsOpen] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
 
-  function openCreate() {
+  const openCreate = useCallback(() => {
     setEditing(null);
     setIsOpen(true);
-  }
+  }, []);
 
-  function openEdit(transaction: Transaction) {
+  const openEdit = useCallback((transaction: Transaction) => {
     setEditing(transaction);
     setIsOpen(true);
-  }
+  }, []);
 
-  function close() {
+  const close = useCallback(() => {
     setIsOpen(false);
     setEditing(null);
-  }
+  }, []);
+
+  const value = useMemo(
+    () => ({ isOpen, editing, openCreate, openEdit, close }),
+    [isOpen, editing, openCreate, openEdit, close]
+  );
 
   return (
-    <TransactionModalContext.Provider value={{ isOpen, editing, openCreate, openEdit, close }}>
+    <TransactionModalContext.Provider value={value}>
       {children}
     </TransactionModalContext.Provider>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, ReactNode } from 'react';
+﻿import { useEffect, useId, useRef, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -52,11 +52,10 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
     requestAnimationFrame(() => {
       const dialog = dialogRef.current;
       if (!dialog) return;
-      // Foca o primeiro campo do conteúdo; o botão X do cabeçalho fica por último.
+      // Foca o primeiro campo do conteúdo; sem campo, foca o dialog (X fica no ciclo Tab).
       const target =
-        dialog.querySelector<HTMLElement>('input, select, textarea') ??
-        dialog.querySelector<HTMLElement>('button');
-      (target ?? dialog).focus();
+        dialog.querySelector<HTMLElement>('input, select, textarea') ?? dialog;
+      target.focus();
     });
 
     return () => {

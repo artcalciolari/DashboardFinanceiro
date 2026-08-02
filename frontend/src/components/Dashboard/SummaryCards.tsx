@@ -1,8 +1,8 @@
-import { TrendingUp, TrendingDown } from 'lucide-react';
+﻿import { TrendingUp, TrendingDown } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { summaryApi, transactionsApi } from '../../services/api';
 import { useDate } from '../../context/DateContext';
-import { formatCurrency, capitalize } from '../../utils/formatters';
+import { formatCurrency, capitalize, sparkChartRange, sparkChartX, formatSummaryAmount } from '../../utils/formatters';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { clsx } from 'clsx';
@@ -49,10 +49,10 @@ export default function SummaryCards() {
 
   const sparkMin = sparkPoints.length ? Math.min(0, ...sparkPoints) : 0;
   const sparkMax = sparkPoints.length ? Math.max(0, ...sparkPoints) : 1;
-  const sparkRange = sparkMax - sparkMin || 1;
+  const sparkRange = sparkChartRange(sparkMin, sparkMax);
   const sparkPts = sparkPoints
     .map((v, i) => {
-      const x = sparkPoints.length > 1 ? (i / (sparkPoints.length - 1)) * 260 : 0;
+      const x = sparkChartX(i, sparkPoints.length);
       const y = 44 - ((v - sparkMin) / sparkRange) * 40;
       return `${Math.round(x)},${Math.round(y)}`;
     })
@@ -110,7 +110,7 @@ export default function SummaryCards() {
         </div>
         <div>
           <div className="tabular mt-4 whitespace-nowrap font-display text-[27px] font-bold tracking-tight text-income">
-            {isLoading ? '—' : formatCurrency(data?.totalIncomeCents ?? 0)}
+            {formatSummaryAmount(isLoading, data?.totalIncomeCents)}
           </div>
           <div className="mt-0.5 text-[12.5px] text-faint">
             {incomeCount} entrada{incomeCount === 1 ? '' : 's'} no mês
@@ -128,7 +128,7 @@ export default function SummaryCards() {
         </div>
         <div>
           <div className="tabular mt-4 whitespace-nowrap font-display text-[27px] font-bold tracking-tight text-expense">
-            {isLoading ? '—' : formatCurrency(data?.totalExpensesCents ?? 0)}
+            {formatSummaryAmount(isLoading, data?.totalExpensesCents)}
           </div>
           <div className="mt-0.5 text-[12.5px] text-faint">
             Fatura total: {formatCurrency(data?.invoiceExpensesCents ?? 0)}

@@ -1,8 +1,13 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Calendar, Pencil } from 'lucide-react';
 import { installmentsApi, accountsApi, categoriesApi } from '../services/api';
-import { formatCurrency, formatDate, parseCurrencyBR } from '../utils/formatters';
+import { formatCurrency, formatDate, parseCurrencyBR, installmentPreviewCents } from '../utils/formatters';
+import {
+  compareOngoingInstallments,
+  compareFinishedInstallments,
+  compareCancelledInstallments,
+} from '../utils/installmentSort';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
@@ -133,28 +138,14 @@ export default function Installments() {
   const selectedAccount = accounts.find((account) => account.id === form.accountId);
   const installmentViews = groups.map(buildInstallmentView);
   const ongoingInstallments = installmentViews
-    .filter((view) => !view.isFinished && !view.isCancelled)
-    .sort((a, b) => {
-      const nextA = a.next ? new Date(a.next.effectiveDate).getTime() : Number.POSITIVE_INFINITY;
-      const nextB = b.next ? new Date(b.next.effectiveDate).getTime() : Number.POSITIVE_INFINITY;
-
-      return nextA - nextB || a.group.description.localeCompare(b.group.description);
-    });
+    .filter((view) => !view.isFinished && !view.isCancelled && view.total > 0)
+    .sort(compareOngoingInstallments);
   const finishedInstallments = installmentViews
     .filter((view) => view.isFinished)
-    .sort((a, b) => {
-      const lastA = a.last ? new Date(a.last.effectiveDate).getTime() : 0;
-      const lastB = b.last ? new Date(b.last.effectiveDate).getTime() : 0;
-
-      return lastB - lastA || a.group.description.localeCompare(b.group.description);
-    });
+    .sort(compareFinishedInstallments);
   const cancelledInstallments = installmentViews
     .filter((view) => view.isCancelled)
-    .sort((a, b) => {
-      const cancelledA = a.group.cancelledAt ? new Date(a.group.cancelledAt).getTime() : 0;
-      const cancelledB = b.group.cancelledAt ? new Date(b.group.cancelledAt).getTime() : 0;
-      return cancelledB - cancelledA || a.group.description.localeCompare(b.group.description);
-    });
+    .sort(compareCancelledInstallments);
 
   const committedMonthly = ongoingInstallments.reduce((sum, view) => sum + view.installmentAmount, 0);
 
@@ -202,8 +193,7 @@ export default function Installments() {
   }
 
   function removeInstallment(mode: 'future' | 'all') {
-    if (!deleteTarget) return;
-    deleteMutation.mutate({ id: deleteTarget.id, mode });
+    deleteMutation.mutate({ id: deleteTarget!.id, mode });
   }
 
   function openPaymentDateModal(group: InstallmentGroup) {
@@ -225,7 +215,11 @@ export default function Installments() {
 
   function submitPaymentDateUpdate(e: React.FormEvent) {
     e.preventDefault();
-    if (!paymentTarget || !firstPaymentDate) return;
+
+    if (!firstPaymentDate) {
+      setFirstPaymentDateError('Informe uma data válida no formato dd/mm/aaaa');
+      return;
+    }
 
     const normalizedDate = brDateToIso(firstPaymentDate);
     if (!normalizedDate) {
@@ -234,7 +228,7 @@ export default function Installments() {
     }
 
     updatePaymentDateMutation.mutate({
-      id: paymentTarget.id,
+      id: paymentTarget!.id,
       paymentDate: `${normalizedDate}T12:00:00.000Z`,
     });
   }
@@ -415,16 +409,16 @@ export default function Installments() {
               Nenhum parcelamento para a referência selecionada
             </div>
           )}
-          {(data?.pagination.totalPages ?? 0) > 1 && (
+          {data && data.pagination.totalPages > 1 && (
             <div className="flex items-center justify-center gap-3">
               <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
                 Anterior
               </Button>
-              <span className="text-xs text-faint">Página {page} de {data?.pagination.totalPages}</span>
+              <span className="text-xs text-faint">Página {page} de {data.pagination.totalPages}</span>
               <Button
                 variant="secondary"
                 size="sm"
-                disabled={page >= (data?.pagination.totalPages ?? 1)}
+                disabled={page >= data.pagination.totalPages}
                 onClick={() => setPage((value) => value + 1)}
               >
                 Próxima
@@ -467,7 +461,7 @@ export default function Installments() {
           {form.totalAmount && form.installmentCount && (
             <p className="rounded-xl bg-[#E9F0EC] p-2.5 text-xs text-forest">
               {parseInt(form.installmentCount)}x de{' '}
-              {formatCurrency((parseCurrencyBR(form.totalAmount) || 0) / (parseInt(form.installmentCount) || 1))}
+              {formatCurrency(installmentPreviewCents(form.totalAmount, form.installmentCount))}
             </p>
           )}
           <div className="grid grid-cols-2 gap-3">
@@ -634,7 +628,6 @@ export default function Installments() {
                 setFirstPaymentDateError('');
               }}
               error={firstPaymentDateError}
-              required
             />
 
             <FormError error={updatePaymentDateMutation.error} />

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
 import { subscriptionsApi, accountsApi, categoriesApi } from '../services/api';
@@ -299,7 +299,7 @@ export default function Subscriptions() {
           <Button
             variant="secondary"
             size="sm"
-            disabled={page >= (data?.pagination.totalPages ?? 1)}
+            disabled={page >= data!.pagination.totalPages}
             onClick={() => setPage((value) => value + 1)}
           >
             Próxima
@@ -481,7 +481,7 @@ export default function Subscriptions() {
           }
         }}
         onConfirm={() => {
-          if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+          deleteMutation.mutate(deleteTarget!.id);
         }}
       />
     </div>

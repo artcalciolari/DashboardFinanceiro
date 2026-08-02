@@ -209,17 +209,11 @@ export async function updateTransaction(req: Request, res: Response, next: NextF
     }
 
     if (data.date || data.accountId) {
-      if (!existing) {
-        existing = await prisma.transaction.findUniqueOrThrow({
-          where: { id: req.params.id },
-          include: { account: true, category: true },
-        });
-      }
       const account = data.accountId
         ? await prisma.account.findUniqueOrThrow({ where: { id: data.accountId } })
-        : existing.account;
+        : existing!.account;
       effectiveDate = calculateEffectiveDate(
-        data.date ? new Date(data.date) : existing.date,
+        data.date ? new Date(data.date) : existing!.date,
         account.type,
         account.closingDay,
         account.dueDay
@@ -227,16 +221,9 @@ export async function updateTransaction(req: Request, res: Response, next: NextF
     }
 
     if (data.categoryId || data.type) {
-      if (!existing) {
-        existing = await prisma.transaction.findUniqueOrThrow({
-          where: { id: req.params.id },
-          include: { account: true, category: true },
-        });
-      }
-
       if (data.categoryId) {
-        await ensureCategoryMatchesType(data.categoryId, data.type ?? existing.type);
-      } else if (existing.category.type !== data.type) {
+        await ensureCategoryMatchesType(data.categoryId, data.type ?? existing!.type);
+      } else if (existing!.category.type !== data.type) {
         throw new HttpError(
           422,
           'A categoria precisa ter o mesmo tipo da transação',

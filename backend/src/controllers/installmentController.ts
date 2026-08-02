@@ -204,11 +204,6 @@ export async function updateInstallmentPaymentDate(req: Request, res: Response, 
     const { firstPaymentDate } = UpdatePaymentDateSchema.parse(req.body);
     const firstDate = new Date(firstPaymentDate);
 
-    if (Number.isNaN(firstDate.getTime())) {
-      res.status(400).json({ message: 'Data de pagamento inválida' });
-      return;
-    }
-
     const group = await prisma.installmentGroup.findUniqueOrThrow({ where: { id: req.params.id } });
     if (group.isCancelled) {
       throw new HttpError(409, 'Não é possível alterar um parcelamento cancelado', 'INSTALLMENT_CANCELLED');
