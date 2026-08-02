@@ -44,11 +44,9 @@ jobs:
         working-directory: frontend
       - run: pnpm exec prisma migrate deploy
         working-directory: backend
-      - run: pnpm test
+      - run: pnpm run test:coverage
         working-directory: backend
       - run: pnpm run test:integration
-        working-directory: backend
-      - run: pnpm run test:coverage
         working-directory: backend
       - run: pnpm run test:coverage
         working-directory: frontend
