@@ -43,7 +43,10 @@ if ! docker inspect "$DB_CONTAINER" >/dev/null 2>&1; then
 fi
 
 mkdir -p "$DEPLOY_DIR/backups" "$DEPLOY_DIR/deploy"
-chmod 600 "$DEPLOY_DIR/.env" "$DEPLOY_DIR/deploy/.htpasswd"
+chmod 600 "$DEPLOY_DIR/.env"
+# The bind-mounted file keeps host ownership. Nginx workers must be able to
+# read its bcrypt hashes; production credentials themselves are not stored here.
+chmod 644 "$DEPLOY_DIR/deploy/.htpasswd"
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 revision="${GITHUB_SHA:-manual}"
@@ -150,6 +153,7 @@ web_stopped=0
 
 docker exec "$BACKEND_CONTAINER" node -e \
   "fetch('http://127.0.0.1:3001/health/ready').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"
+docker exec --user nginx "$FRONTEND_CONTAINER" test -r /etc/nginx/.htpasswd
 
 http_status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' http://127.0.0.1/)"
 if [[ "$http_status" != "401" ]]; then
