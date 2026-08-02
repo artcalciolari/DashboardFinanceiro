@@ -1,4 +1,4 @@
-# DashboardFinanceiro
+﻿# DashboardFinanceiro
 
 Dashboard financeiro pessoal criado para organizar a minha rotina de acompanhamento de receitas, despesas, categorias, recorrências, parcelamentos, alertas e exportação de dados.
 
@@ -126,17 +126,37 @@ suportado ou ocorrências duplicadas; ela não apaga dados automaticamente.
 
 ## Testes e saúde
 
+Gates de cobertura: **100%** statements / branches / functions / lines no
+backend (`src/**/*.ts`, exceto `src/index.ts`) e no frontend
+(`src/**/*.{ts,tsx}`, exceto `main.tsx`, tipos e helpers de teste). Os limiares
+ficam em `backend/vitest.config.ts` e `frontend/vite.config.ts` — `pnpm run
+test:coverage` falha se qualquer métrica cair. O Vitest usa
+`os.availableParallelism()` para paralelizar workers.
+
 ```bash
-cd backend
+# Na raiz: unitários FE + BE
 pnpm test
 
+# Com gates de cobertura (obrigatório no CI)
+pnpm run test:coverage
+
+# Backend: unitários / cobertura / integração
+cd backend
+pnpm test
+pnpm run test:coverage
 # Requer TEST_DATABASE_URL apontando exclusivamente para um banco de testes.
 pnpm run test:integration
-
 pnpm run build
+
+# Frontend
 cd ../frontend
+pnpm test
+pnpm run test:coverage
 pnpm run build
 ```
+
+CI (`CI` workflow) em estágios paralelos: cobertura backend, cobertura frontend e
+integração backend; o job `Build` só roda depois que os três passam.
 
 - `GET /health/live`: processo HTTP ativo.
 - `GET /health/ready`: processo ativo e banco respondendo.

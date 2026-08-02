@@ -2,8 +2,9 @@
 	"private": true,
 	"packageManager": "pnpm@11.9.0",
 	"scripts": {
-		"build": "pnpm --dir backend build && pnpm --dir frontend build",
-		"test": "pnpm --dir backend test"
+		"build": "npm --prefix backend run build && npm --prefix frontend run build",
+		"test": "npm --prefix backend run test && npm --prefix frontend run test",
+		"test:coverage": "npm --prefix backend run test:coverage && npm --prefix frontend run test:coverage"
 	},
 	"devDependencies": {
 		"@types/node": "^26.0.1"

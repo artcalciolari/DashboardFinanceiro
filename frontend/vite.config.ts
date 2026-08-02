@@ -5,6 +5,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+const workers = os.availableParallelism();
+
 // Unique dir avoids concurrent vitest runs wiping shared tmp coverage shards.
 const coverageDir = path.join(
   os.tmpdir(),
@@ -32,14 +34,10 @@ export default defineConfig({
     globals: false,
     setupFiles: ['./src/test/setup.ts'],
     css: true,
-    fileParallelism: false,
+    fileParallelism: true,
     pool: 'threads',
-    maxWorkers: 1,
-    poolOptions: {
-      threads: {
-        singleThread: true,
-      },
-    },
+    maxWorkers: workers,
+    minWorkers: 1,
     coverage: {
       provider: 'v8',
       clean: true,
