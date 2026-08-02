@@ -1,10 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
+import { once } from 'node:events';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { createObjectCsvStringifier } from 'csv-writer';
+import type { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { ensureSubscriptionTransactions, getSubscriptionHorizon } from '../services/subscriptionService';
 import { parsePeriodQuery } from '../utils/period';
+import { formatCentsForCsv } from '../utils/money';
 
 function safeSpreadsheetCell(value: string) {
   const trimmed = value.trimStart();
@@ -14,22 +17,15 @@ function safeSpreadsheetCell(value: string) {
 export async function exportCSV(req: Request, res: Response, next: NextFunction) {
   try {
     const { month, year } = parsePeriodQuery(req.query);
-    const where: Record<string, unknown> = {};
-
+    const baseWhere: Prisma.TransactionWhereInput = {};
     if (month !== undefined && year !== undefined) {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0, 23, 59, 59, 999);
-      where.effectiveDate = { gte: startDate, lte: endDate };
+      baseWhere.effectiveDate = { gte: startDate, lte: endDate };
       await ensureSubscriptionTransactions(endDate);
     } else {
       await ensureSubscriptionTransactions(getSubscriptionHorizon());
     }
-
-    const transactions = await prisma.transaction.findMany({
-      where,
-      include: { account: true, category: true, subscription: true },
-      orderBy: { effectiveDate: 'asc' },
-    });
 
     const stringifier = createObjectCsvStringifier({
       header: [
@@ -48,34 +44,56 @@ export async function exportCSV(req: Request, res: Response, next: NextFunction)
         { id: 'notes', title: 'Observações' },
       ],
     });
-
-    const records = transactions.map((t) => ({
-      date: format(t.date, 'dd/MM/yyyy', { locale: ptBR }),
-      effectiveDate: format(t.effectiveDate, 'dd/MM/yyyy', { locale: ptBR }),
-      description: safeSpreadsheetCell(t.description),
-      category: safeSpreadsheetCell(t.category.name),
-      account: safeSpreadsheetCell(t.account.name),
-      type: t.type === 'INCOME' ? 'Receita' : 'Despesa',
-      amount: t.amount.toFixed(2).replace('.', ','),
-      installment: t.installmentNumber ? `${t.installmentNumber}/${t.totalInstallments}` : '',
-      subscription: t.subscription ? safeSpreadsheetCell(t.subscription.name) : '',
-      thirdParty: t.isThirdParty ? 'Sim' : 'Não',
-      thirdPartyName: t.thirdPartyName ? safeSpreadsheetCell(t.thirdPartyName) : '',
-      reimbursed: t.isThirdParty ? (t.isReimbursed ? 'Sim' : 'Não') : '',
-      notes: t.notes ? safeSpreadsheetCell(t.notes) : '',
-    }));
-
-    const csv = stringifier.getHeaderString() + stringifier.stringifyRecords(records);
-
-    const filename =
-      month && year
-        ? `financeiro_${String(month).padStart(2, '0')}_${year}.csv`
-        : 'financeiro_todos.csv';
-
+    const filename = month && year
+      ? `financeiro_${String(month).padStart(2, '0')}_${year}.csv`
+      : 'financeiro_todos.csv';
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send('\uFEFF' + csv); // BOM UTF-8 para compatibilidade com Excel
+    res.write('\uFEFF' + stringifier.getHeaderString());
+
+    let cursor: { effectiveDate: Date; id: string } | undefined;
+    while (true) {
+      const cursorWhere: Prisma.TransactionWhereInput | undefined = cursor
+        ? { OR: [
+            { effectiveDate: { gt: cursor.effectiveDate } },
+            { effectiveDate: cursor.effectiveDate, id: { gt: cursor.id } },
+          ] }
+        : undefined;
+      const transactions = await prisma.transaction.findMany({
+        where: cursorWhere ? { AND: [baseWhere, cursorWhere] } : baseWhere,
+        include: { account: true, category: true, subscription: true },
+        orderBy: [{ effectiveDate: 'asc' }, { id: 'asc' }],
+        take: 500,
+      });
+      if (transactions.length === 0) break;
+      const records = transactions.map((transaction) => ({
+        date: format(transaction.date, 'dd/MM/yyyy', { locale: ptBR }),
+        effectiveDate: format(transaction.effectiveDate, 'dd/MM/yyyy', { locale: ptBR }),
+        description: safeSpreadsheetCell(transaction.description),
+        category: safeSpreadsheetCell(transaction.category.name),
+        account: safeSpreadsheetCell(transaction.account.name),
+        type: transaction.type === 'INCOME' ? 'Receita' : 'Despesa',
+        amount: formatCentsForCsv(transaction.amountCents),
+        installment: transaction.installmentNumber
+          ? `${transaction.installmentNumber}/${transaction.totalInstallments}`
+          : '',
+        subscription: transaction.subscription ? safeSpreadsheetCell(transaction.subscription.name) : '',
+        thirdParty: transaction.isThirdParty ? 'Sim' : 'Não',
+        thirdPartyName: transaction.thirdPartyName ? safeSpreadsheetCell(transaction.thirdPartyName) : '',
+        reimbursed: transaction.isThirdParty ? (transaction.isReimbursed ? 'Sim' : 'Não') : '',
+        notes: transaction.notes ? safeSpreadsheetCell(transaction.notes) : '',
+      }));
+      if (!res.write(stringifier.stringifyRecords(records))) await once(res, 'drain');
+      const last = transactions.at(-1)!;
+      cursor = { effectiveDate: last.effectiveDate, id: last.id };
+      if (transactions.length < 500) break;
+    }
+    res.end();
   } catch (err) {
+    if (res.headersSent) {
+      res.destroy(err instanceof Error ? err : undefined);
+      return;
+    }
     next(err);
   }
 }

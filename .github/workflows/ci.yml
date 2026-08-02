@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: financeiro_test
+          POSTGRES_PASSWORD: financeiro_test
+          POSTGRES_DB: financeiro_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U financeiro_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://financeiro_test:financeiro_test@localhost:5432/financeiro_test
+      TEST_DATABASE_URL: postgresql://financeiro_test:financeiro_test@localhost:5432/financeiro_test
+      BUSINESS_TIME_ZONE: America/Sao_Paulo
+      TZ: America/Sao_Paulo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            backend/pnpm-lock.yaml
+            frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: backend
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - run: pnpm exec prisma migrate deploy
+        working-directory: backend
+      - run: pnpm test
+        working-directory: backend
+      - run: pnpm run test:integration
+        working-directory: backend
+      - run: pnpm run build
+        working-directory: backend
+      - run: pnpm run build
+        working-directory: frontend

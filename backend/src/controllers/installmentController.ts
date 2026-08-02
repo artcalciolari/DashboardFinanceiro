@@ -4,6 +4,9 @@ import { addMonths } from 'date-fns';
 import prisma from '../lib/prisma';
 import { calculateEffectiveDate } from '../utils/creditCard';
 import { HttpError } from '../utils/httpError';
+import { PositiveMoneyCents, splitInstallmentCents } from '../utils/money';
+import { parsePageQuery } from '../utils/pagination';
+import { futureCutoff } from '../utils/businessTime';
 
 const DateString = z.string().refine((value) => !Number.isNaN(new Date(value).getTime()), {
   message: 'Data inválida',
@@ -11,7 +14,7 @@ const DateString = z.string().refine((value) => !Number.isNaN(new Date(value).ge
 
 const InstallmentSchema = z.object({
   description: z.string().min(1, 'Descrição é obrigatória'),
-  totalAmount: z.number().positive('Valor total deve ser positivo'),
+  totalAmountCents: PositiveMoneyCents,
   installmentCount: z.number().int().min(2, 'Mínimo 2 parcelas').max(120, 'Máximo 120 parcelas'),
   startDate: DateString,
   accountId: z.string(),
@@ -28,15 +31,44 @@ const UpdatePaymentDateSchema = z.object({
 
 export async function getInstallments(req: Request, res: Response, next: NextFunction) {
   try {
-    const groups = await prisma.installmentGroup.findMany({
-      include: {
-        account: true,
-        category: true,
-        transactions: { orderBy: { date: 'asc' } },
-      },
-      orderBy: { createdAt: 'desc' },
+    const { page, pageSize, skip } = parsePageQuery(req.query);
+    const asOf = typeof req.query.asOf === 'string' ? new Date(req.query.asOf) : new Date();
+    if (Number.isNaN(asOf.getTime())) throw new HttpError(422, 'Data de referência inválida', 'INVALID_AS_OF');
+
+    const [groups, total] = await Promise.all([
+      prisma.installmentGroup.findMany({
+        include: {
+          account: true,
+          category: true,
+          transactions: { orderBy: [{ installmentNumber: 'asc' }, { effectiveDate: 'asc' }] },
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip,
+        take: pageSize,
+      }),
+      prisma.installmentGroup.count(),
+    ]);
+
+    const deletionCutoff = futureCutoff();
+    const items = groups.map((group) => {
+      const paidTransactions = group.transactions.filter((transaction) => transaction.effectiveDate <= asOf);
+      const futureTransactions = group.transactions.filter((transaction) => transaction.effectiveDate > asOf);
+      return {
+        ...group,
+        transactions: undefined,
+        paidCount: paidTransactions.length,
+        futureCount: futureTransactions.length,
+        historicalCount: group.transactions.filter((transaction) => transaction.effectiveDate < deletionCutoff).length,
+        deletableFutureCount: group.transactions.filter((transaction) => transaction.effectiveDate >= deletionCutoff).length,
+        remainingAmountCents: futureTransactions.reduce((sum, transaction) => sum + transaction.amountCents, 0),
+        installmentAmountCents: futureTransactions[0]?.amountCents ?? group.transactions.at(-1)?.amountCents ?? 0,
+        firstTransaction: group.transactions[0] ?? null,
+        nextTransaction: futureTransactions[0] ?? null,
+        lastTransaction: group.transactions.at(-1) ?? null,
+      };
     });
-    res.json(groups);
+
+    res.json({ items, pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } });
   } catch (err) {
     next(err);
   }
@@ -52,10 +84,10 @@ export async function createInstallment(req: Request, res: Response, next: NextF
       throw new HttpError(422, 'Parcelamentos devem usar uma categoria de despesa', 'CATEGORY_TYPE_MISMATCH');
     }
 
-    const totalCents = Math.round(data.totalAmount * 100);
-    const totalAmount = totalCents / 100;
-    const baseInstallmentCents = Math.floor(totalCents / data.installmentCount);
-    const remainderCents = totalCents - baseInstallmentCents * data.installmentCount;
+    if (data.totalAmountCents < data.installmentCount) {
+      throw new HttpError(422, 'Cada parcela precisa ter pelo menos um centavo', 'INSTALLMENT_TOO_SMALL');
+    }
+    const installmentAmounts = splitInstallmentCents(data.totalAmountCents, data.installmentCount);
     const startDate = new Date(data.startDate);
     const isThirdParty = data.isThirdParty === true;
 
@@ -73,7 +105,7 @@ export async function createInstallment(req: Request, res: Response, next: NextF
       const group = await tx.installmentGroup.create({
         data: {
           description: data.description,
-          totalAmount,
+          totalAmountCents: data.totalAmountCents,
           installmentCount: data.installmentCount,
           startDate,
           isThirdParty,
@@ -86,15 +118,13 @@ export async function createInstallment(req: Request, res: Response, next: NextF
 
       const transactionsData = [];
       for (let i = 0; i < data.installmentCount; i++) {
-        const purchaseDate = addMonths(startDate, i);
+        const purchaseDate = startDate;
         const effectiveDate = addMonths(firstPaymentDate, i);
-        const installmentCents = baseInstallmentCents + (
-          i === data.installmentCount - 1 ? remainderCents : 0
-        );
+        const installmentCents = installmentAmounts[i];
 
         transactionsData.push({
           description: `${data.description} (${i + 1}/${data.installmentCount})`,
-          amount: installmentCents / 100,
+          amountCents: installmentCents,
           type: 'EXPENSE' as const,
           date: purchaseDate,
           effectiveDate,
@@ -144,7 +174,7 @@ export async function deleteInstallment(req: Request, res: Response, next: NextF
         await tx.transaction.deleteMany({
           where: {
             installmentGroupId: req.params.id,
-            effectiveDate: { gte: new Date() },
+            effectiveDate: { gte: futureCutoff() },
           },
         });
 
@@ -212,6 +242,26 @@ export async function updateInstallmentPaymentDate(req: Request, res: Response, 
     });
 
     res.json(updatedGroup);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getInstallmentTransactions(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { page, pageSize, skip } = parsePageQuery(req.query);
+    const where = { installmentGroupId: req.params.id };
+    const [items, total] = await Promise.all([
+      prisma.transaction.findMany({
+        where,
+        include: { account: true, category: true },
+        orderBy: [{ installmentNumber: 'asc' }, { effectiveDate: 'asc' }],
+        skip,
+        take: pageSize,
+      }),
+      prisma.transaction.count({ where }),
+    ]);
+    res.json({ items, pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } });
   } catch (err) {
     next(err);
   }

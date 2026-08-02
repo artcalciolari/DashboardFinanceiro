@@ -1,4 +1,10 @@
 {
+	"private": true,
+	"packageManager": "pnpm@11.9.0",
+	"scripts": {
+		"build": "pnpm --dir backend build && pnpm --dir frontend build",
+		"test": "pnpm --dir backend test"
+	},
 	"devDependencies": {
 		"@types/node": "^26.0.1"
 	}

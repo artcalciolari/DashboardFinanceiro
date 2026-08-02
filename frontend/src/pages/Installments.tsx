@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Calendar, Pencil } from 'lucide-react';
 import { installmentsApi, accountsApi, categoriesApi } from '../services/api';
@@ -9,7 +9,7 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import FormError from '../components/ui/FormError';
 import { clsx } from 'clsx';
-import type { InstallmentGroup } from '../types';
+import type { InstallmentGroup, Transaction } from '../types';
 import { useDate } from '../context/DateContext';
 import { getLocalDateInput } from '../utils/formatters';
 
@@ -32,8 +32,9 @@ interface InstallmentView {
   total: number;
   pct: number;
   installmentAmount: number;
-  next?: InstallmentGroup['transactions'][number];
-  last?: InstallmentGroup['transactions'][number];
+  remainingAmount: number;
+  next?: Transaction;
+  last?: Transaction;
   isFinished: boolean;
   isCancelled: boolean;
 }
@@ -84,12 +85,8 @@ function brDateToIso(value: string) {
   return `${year}-${month}-${day}`;
 }
 
-function buildInstallmentView(group: InstallmentGroup, periodEnd: Date): InstallmentView {
-  const installments = group.transactions.slice().sort((a, b) => {
-    const dateDiff = new Date(a.effectiveDate).getTime() - new Date(b.effectiveDate).getTime();
-    return dateDiff || (a.installmentNumber ?? 0) - (b.installmentNumber ?? 0);
-  });
-  const paid = installments.filter((t) => new Date(t.effectiveDate) <= periodEnd).length;
+function buildInstallmentView(group: InstallmentGroup): InstallmentView {
+  const paid = group.paidCount ?? 0;
   const total = group.installmentCount;
   const pct = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
   const isCancelled = group.isCancelled;
@@ -99,9 +96,10 @@ function buildInstallmentView(group: InstallmentGroup, periodEnd: Date): Install
     paid,
     total,
     pct,
-    installmentAmount: total > 0 ? group.totalAmount / total : 0,
-    next: installments.find((t) => new Date(t.effectiveDate) > periodEnd),
-    last: installments[installments.length - 1],
+    installmentAmount: group.installmentAmountCents ?? 0,
+    remainingAmount: group.remainingAmountCents ?? 0,
+    next: group.nextTransaction ?? undefined,
+    last: group.lastTransaction ?? undefined,
     isFinished: !isCancelled && total > 0 && paid >= total,
     isCancelled,
   };
@@ -116,20 +114,24 @@ export default function Installments() {
   const [firstPaymentDate, setFirstPaymentDate] = useState('');
   const [firstPaymentDateError, setFirstPaymentDateError] = useState('');
   const [form, setForm] = useState<FormState>(createEmptyForm);
+  const [page, setPage] = useState(1);
+  const selectedPeriodEnd = useMemo(
+    () => new Date(year, month, 0, 23, 59, 59, 999),
+    [month, year]
+  );
 
-  const { data: groups = [], isLoading } = useQuery({
-    queryKey: ['installments'],
-    queryFn: installmentsApi.getAll,
+  const { data, isLoading } = useQuery({
+    queryKey: ['installments', page, month, year],
+    queryFn: () => installmentsApi.getPage(page, 25, selectedPeriodEnd.toISOString()),
   });
-  const selectedPeriodEnd = new Date(year, month, 0, 23, 59, 59, 999);
-  const today = new Date();
+  const groups = data?.items ?? [];
 
   const { data: accounts = [] } = useQuery({ queryKey: ['accounts'], queryFn: accountsApi.getAll });
   const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: categoriesApi.getAll });
 
   const expenseCategories = categories.filter((c) => c.type === 'EXPENSE');
   const selectedAccount = accounts.find((account) => account.id === form.accountId);
-  const installmentViews = groups.map((group) => buildInstallmentView(group, selectedPeriodEnd));
+  const installmentViews = groups.map(buildInstallmentView);
   const ongoingInstallments = installmentViews
     .filter((view) => !view.isFinished && !view.isCancelled)
     .sort((a, b) => {
@@ -205,9 +207,7 @@ export default function Installments() {
   }
 
   function openPaymentDateModal(group: InstallmentGroup) {
-    const first = group.transactions
-      .slice()
-      .sort((a, b) => (a.installmentNumber ?? 0) - (b.installmentNumber ?? 0))[0];
+    const first = group.firstTransaction ?? undefined;
 
     setPaymentTarget(group);
     setFirstPaymentDate(isoDateToBr(first ? first.effectiveDate : new Date().toISOString()));
@@ -243,7 +243,7 @@ export default function Installments() {
     e.preventDefault();
     createMutation.mutate({
       description: form.description,
-      totalAmount: parseCurrencyBR(form.totalAmount),
+      totalAmountCents: parseCurrencyBR(form.totalAmount),
       installmentCount: parseInt(form.installmentCount),
       startDate: new Date(form.startDate + 'T12:00:00').toISOString(),
       accountId: form.accountId,
@@ -256,7 +256,7 @@ export default function Installments() {
   }
 
   function renderInstallmentCard(view: InstallmentView) {
-    const { group, paid, total, pct, installmentAmount, next, last, isFinished, isCancelled } = view;
+    const { group, paid, total, pct, installmentAmount, remainingAmount, next, last, isFinished, isCancelled } = view;
 
     return (
       <div key={group.id} className="card">
@@ -316,7 +316,7 @@ export default function Installments() {
           <span className="text-[13px] text-faint">/mês</span>
         </div>
         <div className="mb-3.5 text-[12.5px] text-faint">
-          Total {formatCurrency(group.totalAmount)} ·{' '}
+          Total {formatCurrency(group.totalAmountCents)} ·{' '}
           {isCancelled
             ? group.cancelledAt
               ? `cancelado em ${formatDate(group.cancelledAt)}`
@@ -325,7 +325,7 @@ export default function Installments() {
             ? last
               ? `finalizado em ${formatDate(last.effectiveDate)}`
               : 'finalizado'
-            : `restam ${formatCurrency(installmentAmount * (total - paid))}`}
+            : `restam ${formatCurrency(remainingAmount)}`}
         </div>
         <div className="mb-2 h-2 overflow-hidden rounded-pill bg-chip">
           <div
@@ -413,6 +413,22 @@ export default function Installments() {
           {ongoingInstallments.length === 0 && finishedInstallments.length === 0 && cancelledInstallments.length === 0 && (
             <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-faint">
               Nenhum parcelamento para a referência selecionada
+            </div>
+          )}
+          {(data?.pagination.totalPages ?? 0) > 1 && (
+            <div className="flex items-center justify-center gap-3">
+              <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
+                Anterior
+              </Button>
+              <span className="text-xs text-faint">Página {page} de {data?.pagination.totalPages}</span>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={page >= (data?.pagination.totalPages ?? 1)}
+                onClick={() => setPage((value) => value + 1)}
+              >
+                Próxima
+              </Button>
             </div>
           )}
         </div>
@@ -561,8 +577,8 @@ export default function Installments() {
 
             <div className="rounded-xl border border-border bg-chip/60 p-3 text-sm text-ink">
               <p>
-                {deleteTarget.transactions.filter((t) => new Date(t.effectiveDate) <= today).length} parcela(s) já registrada(s)
-                e {deleteTarget.transactions.filter((t) => new Date(t.effectiveDate) > today).length} futura(s).
+                {deleteTarget.historicalCount ?? 0} parcela(s) no histórico
+                e {deleteTarget.deletableFutureCount ?? 0} futura(s).
               </p>
             </div>
 

@@ -1,11 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import type { Account, Category, Transaction } from '@prisma/client';
+import { Prisma, type Account, type Category, type Transaction } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { calculateEffectiveDate } from '../utils/creditCard';
 import { ensureSubscriptionTransactions, getSubscriptionHorizon } from '../services/subscriptionService';
 import { HttpError } from '../utils/httpError';
 import { parsePeriodQuery } from '../utils/period';
+import { PositiveMoneyCents } from '../utils/money';
+import { decodeDateCursor, encodeDateCursor, parseLimit } from '../utils/pagination';
 
 const DateString = z.string().refine((value) => !Number.isNaN(new Date(value).getTime()), {
   message: 'Data inválida',
@@ -13,7 +15,7 @@ const DateString = z.string().refine((value) => !Number.isNaN(new Date(value).ge
 
 const TransactionSchema = z.object({
   description: z.string().min(1, 'Descrição é obrigatória'),
-  amount: z.number().positive('Valor deve ser positivo'),
+  amountCents: PositiveMoneyCents,
   type: z.enum(['INCOME', 'EXPENSE']),
   date: DateString,
   accountId: z.string(),
@@ -70,10 +72,12 @@ function getThirdPartyData(
 
 export async function getTransactions(req: Request, res: Response, next: NextFunction) {
   try {
-    const { accountId, categoryId, type } = req.query;
+    const { accountId, categoryId, type, origin, search } = req.query;
     const { month, year } = parsePeriodQuery(req.query);
+    const limit = parseLimit(req.query.limit);
+    const cursor = decodeDateCursor(req.query.cursor);
 
-    const where: Record<string, unknown> = {};
+    const where: Prisma.TransactionWhereInput = {};
 
     if (month !== undefined && year !== undefined) {
       const startDate = new Date(year, month - 1, 1);
@@ -86,15 +90,56 @@ export async function getTransactions(req: Request, res: Response, next: NextFun
 
     if (accountId) where.accountId = accountId as string;
     if (categoryId) where.categoryId = categoryId as string;
-    if (type) where.type = type as string;
+    if (type === 'INCOME' || type === 'EXPENSE') where.type = type;
+    if (typeof search === 'string' && search.trim()) {
+      where.OR = [
+        { description: { contains: search.trim(), mode: 'insensitive' } },
+        { account: { name: { contains: search.trim(), mode: 'insensitive' } } },
+        { category: { name: { contains: search.trim(), mode: 'insensitive' } } },
+      ];
+    }
+    if (origin === 'single') where.AND = [{ installmentGroupId: null }, { subscriptionId: null }];
+    if (origin === 'installment') where.installmentGroupId = { not: null };
+    if (origin === 'subscription') where.subscriptionId = { not: null };
+    if (origin === 'thirdParty') where.isThirdParty = true;
+    const baseWhere = { ...where };
+    let pagedWhere = baseWhere;
+    if (cursor) {
+      const cursorDate = new Date(cursor.effectiveDate);
+      const cursorFilter: Prisma.TransactionWhereInput = {
+        OR: [
+          { effectiveDate: { lt: cursorDate } },
+          { effectiveDate: cursorDate, id: { lt: cursor.id } },
+        ],
+      };
+      pagedWhere = { AND: [baseWhere, cursorFilter] };
+    }
 
-    const transactions = await prisma.transaction.findMany({
-      where,
-      include: { account: true, category: true, subscription: true },
-      orderBy: { effectiveDate: 'desc' },
+    const [transactions, totalCount, groupedTotals] = await Promise.all([
+      prisma.transaction.findMany({
+        where: pagedWhere,
+        include: { account: true, category: true, subscription: true },
+        orderBy: [{ effectiveDate: 'desc' }, { id: 'desc' }],
+        take: limit + 1,
+      }),
+      prisma.transaction.count({ where: baseWhere }),
+      prisma.transaction.groupBy({ by: ['type'], where: baseWhere, _sum: { amountCents: true } }),
+    ]);
+
+    const hasMore = transactions.length > limit;
+    const items = hasMore ? transactions.slice(0, limit) : transactions;
+    const last = items.at(-1);
+    res.json({
+      items,
+      nextCursor: hasMore && last
+        ? encodeDateCursor({ effectiveDate: last.effectiveDate.toISOString(), id: last.id })
+        : null,
+      totalCount,
+      totals: {
+        incomeCents: groupedTotals.find((row) => row.type === 'INCOME')?._sum.amountCents ?? 0,
+        expenseCents: groupedTotals.find((row) => row.type === 'EXPENSE')?._sum.amountCents ?? 0,
+      },
     });
-
-    res.json(transactions);
   } catch (err) {
     next(err);
   }
@@ -120,7 +165,7 @@ export async function createTransaction(req: Request, res: Response, next: NextF
     const transaction = await prisma.transaction.create({
       data: {
         description: data.description,
-        amount: data.amount,
+        amountCents: data.amountCents,
         type: data.type,
         date: purchaseDate,
         effectiveDate,

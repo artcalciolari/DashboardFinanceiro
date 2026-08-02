@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useDeferredValue, useMemo, useState } from 'react';
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Pencil, Trash2, SlidersHorizontal, X } from 'lucide-react';
 import { transactionsApi, accountsApi, categoriesApi, getApiErrorMessage } from '../services/api';
 import { useDate } from '../context/DateContext';
@@ -35,10 +35,28 @@ export default function Transactions() {
   const [originFilter, setOriginFilter] = useState<OriginFilter>('all');
   const [showFilters, setShowFilters] = useState(false);
 
-  const { data: transactions = [], isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['transactions', month, year],
-    queryFn: () => transactionsApi.getAll({ month, year }),
+  const deferredSearch = useDeferredValue(search.trim());
+  const transactionQuery = useInfiniteQuery({
+    queryKey: [
+      'transactions', month, year, typeFilter, accountFilter, categoryFilter, originFilter, deferredSearch,
+    ],
+    queryFn: ({ pageParam }) => transactionsApi.getPage({
+      month,
+      year,
+      type: typeFilter === 'all' ? undefined : typeFilter,
+      accountId: accountFilter === 'all' ? undefined : accountFilter,
+      categoryId: categoryFilter === 'all' ? undefined : categoryFilter,
+      origin: originFilter === 'all' ? undefined : originFilter,
+      search: deferredSearch || undefined,
+    }, pageParam),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
+  const { isLoading, isError, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = transactionQuery;
+  const transactions = useMemo(
+    () => transactionQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [transactionQuery.data]
+  );
 
   const { data: accounts = [] } = useQuery({ queryKey: ['accounts'], queryFn: accountsApi.getAll });
   const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: categoriesApi.getAll });
@@ -52,30 +70,15 @@ export default function Transactions() {
     },
   });
 
-  const q = search.trim().toLowerCase();
-  const filtered = transactions.filter((t) => {
-    const okType = typeFilter === 'all' || t.type === typeFilter;
-    const okAccount = accountFilter === 'all' || t.accountId === accountFilter;
-    const okCategory = categoryFilter === 'all' || t.categoryId === categoryFilter;
-    const okOrigin =
-      originFilter === 'all' ||
-      (originFilter === 'single' && !t.installmentGroupId && !t.subscriptionId) ||
-      (originFilter === 'installment' && !!t.installmentGroupId) ||
-      (originFilter === 'subscription' && !!t.subscriptionId) ||
-      (originFilter === 'thirdParty' && t.isThirdParty);
-    const okSearch =
-      !q ||
-      t.description.toLowerCase().includes(q) ||
-      t.category.name.toLowerCase().includes(q) ||
-      t.account.name.toLowerCase().includes(q);
-    return okType && okAccount && okCategory && okOrigin && okSearch;
-  });
+  const filtered = transactions;
 
-  const sumIncome = filtered.filter((t) => t.type === 'INCOME').reduce((s, t) => s + t.amount, 0);
-  const sumExpense = filtered.filter((t) => t.type === 'EXPENSE').reduce((s, t) => s + t.amount, 0);
+  const firstPage = transactionQuery.data?.pages[0];
+  const sumIncome = firstPage?.totals.incomeCents ?? 0;
+  const sumExpense = firstPage?.totals.expenseCents ?? 0;
+  const totalCount = firstPage?.totalCount ?? 0;
   const advancedFilterCount =
     (accountFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0) + (originFilter !== 'all' ? 1 : 0);
-  const hasActiveFilters = typeFilter !== 'all' || q.length > 0 || advancedFilterCount > 0;
+  const hasActiveFilters = typeFilter !== 'all' || deferredSearch.length > 0 || advancedFilterCount > 0;
 
   function resetFilters() {
     setTypeFilter('all');
@@ -113,7 +116,7 @@ export default function Transactions() {
         <div>
           <h1 className="font-display text-[24px] font-bold tracking-tight text-ink">Transações</h1>
           <p className="mt-1 text-sm text-muted">
-            {filtered.length} lançamento{filtered.length === 1 ? '' : 's'} · <span className="capitalize">{formatMonthYear(month, year)}</span>
+            {totalCount} lançamento{totalCount === 1 ? '' : 's'} · <span className="capitalize">{formatMonthYear(month, year)}</span>
           </p>
         </div>
       </div>
@@ -327,7 +330,7 @@ export default function Transactions() {
                 </div>
                 <div className="flex-shrink-0 text-right">
                   <div className={clsx('tabular font-display text-[15px] font-bold', t.type === 'INCOME' ? 'text-income' : 'text-expense')}>
-                    {t.type === 'INCOME' ? '+ ' : '- '}{formatCurrency(t.amount)}
+                    {t.type === 'INCOME' ? '+ ' : '- '}{formatCurrency(t.amountCents)}
                   </div>
                   <div className="mt-0.5 text-xs text-faint">{formatDate(t.effectiveDate)}</div>
                 </div>
@@ -353,6 +356,13 @@ export default function Transactions() {
                 )}
               </div>
             ))}
+            {hasNextPage && (
+              <div className="flex justify-center p-4">
+                <Button variant="secondary" size="sm" loading={isFetchingNextPage} onClick={() => fetchNextPage()}>
+                  Carregar mais
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, CreditCard, Building2, Wallet, TrendingUp } from 'lucide-react';
 import { accountsApi } from '../services/api';
-import { formatCurrency, parseCurrencyBR, ACCOUNT_TYPE_LABELS } from '../utils/formatters';
+import { centsToInput, formatCurrency, parseCurrencyBR, ACCOUNT_TYPE_LABELS } from '../utils/formatters';
 import type { Account, AccountType } from '../types';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -86,8 +86,8 @@ export default function Accounts() {
     setForm({
       name: account.name,
       type: account.type,
-      balance: String(account.balance),
-      creditLimit: account.creditLimit ? String(account.creditLimit) : '',
+      balance: centsToInput(account.openingBalanceCents),
+      creditLimit: centsToInput(account.creditLimitCents),
       color: account.color,
       closingDay: account.closingDay ? String(account.closingDay) : '',
       dueDay: account.dueDay ? String(account.dueDay) : '',
@@ -108,9 +108,9 @@ export default function Accounts() {
     const payload = {
       name: form.name,
       type: form.type,
-      balance: form.type === 'CREDIT_CARD' ? 0 : parseCurrencyBR(form.balance),
+      openingBalanceCents: form.type === 'CREDIT_CARD' ? 0 : parseCurrencyBR(form.balance),
       color: form.color,
-      creditLimit:
+      creditLimitCents:
         form.type === 'CREDIT_CARD' && form.creditLimit
           ? parseCurrencyBR(form.creditLimit)
           : null,
@@ -127,7 +127,7 @@ export default function Accounts() {
 
   const cashBalance = accounts
     .filter((account) => account.type !== 'CREDIT_CARD')
-    .reduce((sum, account) => sum + account.balance, 0);
+    .reduce((sum, account) => sum + account.openingBalanceCents, 0);
   const creditCards = accounts.filter((account) => account.type === 'CREDIT_CARD');
 
   return (
@@ -195,7 +195,7 @@ export default function Accounts() {
                     <>
                       <p className="text-[12.5px] text-faint">Limite total</p>
                       <p className="tabular mt-0.5 font-display text-[26px] font-bold tracking-tight text-ink">
-                        {account.creditLimit ? formatCurrency(account.creditLimit) : 'Não informado'}
+                        {account.creditLimitCents ? formatCurrency(account.creditLimitCents) : 'Não informado'}
                       </p>
                       {(account.closingDay || account.dueDay) && (
                         <p className="mt-1 text-xs text-faint">
@@ -214,7 +214,7 @@ export default function Accounts() {
                         className="tabular mt-0.5 font-display text-[26px] font-bold tracking-tight"
                         style={{ color: positive ? '#0F7A52' : undefined }}
                       >
-                        {formatCurrency(account.balance)}
+                        {formatCurrency(account.openingBalanceCents)}
                       </p>
                     </>
                   )}

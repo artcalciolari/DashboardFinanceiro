@@ -4,47 +4,67 @@ import { ensureSubscriptionTransactions } from '../services/subscriptionService'
 import { parsePeriodQuery } from '../utils/period';
 
 function getPeriodDates(month: number, year: number) {
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0, 23, 59, 59);
-  return { startDate, endDate };
+  return {
+    startDate: new Date(year, month - 1, 1),
+    endDate: new Date(year, month, 0, 23, 59, 59, 999),
+  };
+}
+
+function getRequestedPeriod(req: Request) {
+  const now = new Date();
+  const period = parsePeriodQuery(req.query);
+  const month = period.month ?? now.getMonth() + 1;
+  const year = period.year ?? now.getFullYear();
+  return { month, year, ...getPeriodDates(month, year) };
+}
+
+interface Totals {
+  incomeCents: number;
+  invoiceExpensesCents: number;
+  thirdPartyExpensesCents: number;
+  receivableCents: number;
+}
+
+function emptyTotals(): Totals {
+  return { incomeCents: 0, invoiceExpensesCents: 0, thirdPartyExpensesCents: 0, receivableCents: 0 };
+}
+
+function addTransaction(totals: Totals, transaction: {
+  type: 'INCOME' | 'EXPENSE'; amountCents: number; isThirdParty: boolean; isReimbursed: boolean;
+}) {
+  if (transaction.type === 'INCOME') {
+    totals.incomeCents += transaction.amountCents;
+    return;
+  }
+  totals.invoiceExpensesCents += transaction.amountCents;
+  if (transaction.isThirdParty) {
+    totals.thirdPartyExpensesCents += transaction.amountCents;
+    if (!transaction.isReimbursed) totals.receivableCents += transaction.amountCents;
+  }
+}
+
+function serializeTotals(totals: Totals) {
+  const expensesCents = totals.invoiceExpensesCents - totals.thirdPartyExpensesCents;
+  return { ...totals, expensesCents, netCents: totals.incomeCents - expensesCents };
 }
 
 export async function getMonthlySummary(req: Request, res: Response, next: NextFunction) {
   try {
-    const now = new Date();
-    const period = parsePeriodQuery(req.query);
-    const month = period.month ?? now.getMonth() + 1;
-    const year = period.year ?? now.getFullYear();
-    const { startDate, endDate } = getPeriodDates(month, year);
-
+    const { month, year, startDate, endDate } = getRequestedPeriod(req);
     await ensureSubscriptionTransactions(endDate);
-
     const transactions = await prisma.transaction.findMany({
       where: { effectiveDate: { gte: startDate, lte: endDate } },
+      select: { type: true, amountCents: true, isThirdParty: true, isReimbursed: true },
     });
-
-    const totalIncome = transactions
-      .filter((t) => t.type === 'INCOME')
-      .reduce((sum, t) => sum + t.amount, 0);
-
-    const invoiceExpenses = transactions
-      .filter((t) => t.type === 'EXPENSE')
-      .reduce((sum, t) => sum + t.amount, 0);
-    const thirdPartyExpenses = transactions
-      .filter((t) => t.type === 'EXPENSE' && t.isThirdParty)
-      .reduce((sum, t) => sum + t.amount, 0);
-    const receivableAmount = transactions
-      .filter((t) => t.type === 'EXPENSE' && t.isThirdParty && !t.isReimbursed)
-      .reduce((sum, t) => sum + t.amount, 0);
-    const totalExpenses = invoiceExpenses - thirdPartyExpenses;
-
+    const totals = emptyTotals();
+    for (const transaction of transactions) addTransaction(totals, transaction);
     res.json({
-      totalIncome,
-      totalExpenses,
-      invoiceExpenses,
-      thirdPartyExpenses,
-      receivableAmount,
-      balance: totalIncome - totalExpenses,
+      totalIncomeCents: totals.incomeCents,
+      totalExpensesCents: totals.invoiceExpensesCents - totals.thirdPartyExpensesCents,
+      invoiceExpensesCents: totals.invoiceExpensesCents,
+      thirdPartyExpensesCents: totals.thirdPartyExpensesCents,
+      receivableAmountCents: totals.receivableCents,
+      balanceCents: totals.incomeCents - (totals.invoiceExpensesCents - totals.thirdPartyExpensesCents),
       month,
       year,
     });
@@ -55,30 +75,22 @@ export async function getMonthlySummary(req: Request, res: Response, next: NextF
 
 export async function getCategorySummary(req: Request, res: Response, next: NextFunction) {
   try {
-    const now = new Date();
-    const period = parsePeriodQuery(req.query);
-    const month = period.month ?? now.getMonth() + 1;
-    const year = period.year ?? now.getFullYear();
-    const { startDate, endDate } = getPeriodDates(month, year);
-
+    const { startDate, endDate } = getRequestedPeriod(req);
     await ensureSubscriptionTransactions(endDate);
-
-    const grouped = await prisma.transaction.groupBy({
-      by: ['categoryId', 'type'],
-      where: { effectiveDate: { gte: startDate, lte: endDate }, isThirdParty: false },
-      _sum: { amount: true },
-    });
-
-    const categories = await prisma.category.findMany();
-    const catMap = Object.fromEntries(categories.map((c) => [c.id, c]));
-
-    const result = grouped.map((r) => ({
-      category: catMap[r.categoryId],
-      type: r.type,
-      total: r._sum.amount ?? 0,
-    }));
-
-    res.json(result);
+    const [grouped, categories] = await Promise.all([
+      prisma.transaction.groupBy({
+        by: ['categoryId', 'type'],
+        where: { effectiveDate: { gte: startDate, lte: endDate }, isThirdParty: false },
+        _sum: { amountCents: true },
+      }),
+      prisma.category.findMany(),
+    ]);
+    const categoryById = new Map(categories.map((category) => [category.id, category]));
+    res.json(grouped.map((row) => ({
+      category: categoryById.get(row.categoryId),
+      type: row.type,
+      totalCents: row._sum.amountCents ?? 0,
+    })));
   } catch (err) {
     next(err);
   }
@@ -88,39 +100,32 @@ export async function getMonthlyEvolution(req: Request, res: Response, next: Nex
   try {
     const months = 6;
     const now = new Date();
-    const result = [];
-
-    const { endDate } = getPeriodDates(now.getMonth() + 1, now.getFullYear());
+    const periods = Array.from({ length: months }, (_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - (months - 1 - index), 1);
+      return { month: date.getMonth() + 1, year: date.getFullYear(), date, totals: emptyTotals() };
+    });
+    const first = periods[0];
+    const last = periods.at(-1)!;
+    const startDate = getPeriodDates(first.month, first.year).startDate;
+    const endDate = getPeriodDates(last.month, last.year).endDate;
     await ensureSubscriptionTransactions(endDate);
-
-    for (let i = months - 1; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const { startDate, endDate } = getPeriodDates(
-        date.getMonth() + 1,
-        date.getFullYear()
-      );
-
-      const transactions = await prisma.transaction.findMany({
-        where: { effectiveDate: { gte: startDate, lte: endDate } },
-      });
-
-      const income = transactions
-        .filter((t) => t.type === 'INCOME')
-        .reduce((s, t) => s + t.amount, 0);
-      const expenses = transactions
-        .filter((t) => t.type === 'EXPENSE' && !t.isThirdParty)
-        .reduce((s, t) => s + t.amount, 0);
-
-      result.push({
-        month: date.getMonth() + 1,
-        year: date.getFullYear(),
-        label: date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
-        income,
-        expenses,
-      });
+    const transactions = await prisma.transaction.findMany({
+      where: { effectiveDate: { gte: startDate, lte: endDate } },
+      select: { effectiveDate: true, type: true, amountCents: true, isThirdParty: true, isReimbursed: true },
+    });
+    const totalsByPeriod = new Map(periods.map((period) => [`${period.year}-${period.month}`, period.totals]));
+    for (const transaction of transactions) {
+      const key = `${transaction.effectiveDate.getFullYear()}-${transaction.effectiveDate.getMonth() + 1}`;
+      const totals = totalsByPeriod.get(key);
+      if (totals) addTransaction(totals, transaction);
     }
-
-    res.json(result);
+    res.json(periods.map((period) => ({
+      month: period.month,
+      year: period.year,
+      label: period.date.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
+      incomeCents: period.totals.incomeCents,
+      expensesCents: period.totals.invoiceExpensesCents - period.totals.thirdPartyExpensesCents,
+    })));
   } catch (err) {
     next(err);
   }
@@ -128,49 +133,21 @@ export async function getMonthlyEvolution(req: Request, res: Response, next: Nex
 
 export async function getAccountSummary(req: Request, res: Response, next: NextFunction) {
   try {
-    const now = new Date();
-    const period = parsePeriodQuery(req.query);
-    const month = period.month ?? now.getMonth() + 1;
-    const year = period.year ?? now.getFullYear();
-    const { startDate, endDate } = getPeriodDates(month, year);
-
+    const { startDate, endDate } = getRequestedPeriod(req);
     await ensureSubscriptionTransactions(endDate);
-
-    const accounts = await prisma.account.findMany();
-
-    const result = await Promise.all(
-      accounts.map(async (account) => {
-        const transactions = await prisma.transaction.findMany({
-          where: { accountId: account.id, effectiveDate: { gte: startDate, lte: endDate } },
-        });
-
-        const income = transactions
-          .filter((t) => t.type === 'INCOME')
-          .reduce((s, t) => s + t.amount, 0);
-        const invoiceExpenses = transactions
-          .filter((t) => t.type === 'EXPENSE')
-          .reduce((s, t) => s + t.amount, 0);
-        const thirdPartyExpenses = transactions
-          .filter((t) => t.type === 'EXPENSE' && t.isThirdParty)
-          .reduce((s, t) => s + t.amount, 0);
-        const receivableAmount = transactions
-          .filter((t) => t.type === 'EXPENSE' && t.isThirdParty && !t.isReimbursed)
-          .reduce((s, t) => s + t.amount, 0);
-        const expenses = invoiceExpenses - thirdPartyExpenses;
-
-        return {
-          account,
-          income,
-          expenses,
-          invoiceExpenses,
-          thirdPartyExpenses,
-          receivableAmount,
-          net: income - expenses,
-        };
-      })
-    );
-
-    res.json(result);
+    const [accounts, transactions] = await Promise.all([
+      prisma.account.findMany(),
+      prisma.transaction.findMany({
+        where: { effectiveDate: { gte: startDate, lte: endDate } },
+        select: { accountId: true, type: true, amountCents: true, isThirdParty: true, isReimbursed: true },
+      }),
+    ]);
+    const totalsByAccount = new Map(accounts.map((account) => [account.id, emptyTotals()]));
+    for (const transaction of transactions) {
+      const totals = totalsByAccount.get(transaction.accountId);
+      if (totals) addTransaction(totals, transaction);
+    }
+    res.json(accounts.map((account) => ({ account, ...serializeTotals(totalsByAccount.get(account.id)!) })));
   } catch (err) {
     next(err);
   }

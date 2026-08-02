@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Bell, BellOff } from 'lucide-react';
 import { alertsApi, categoriesApi } from '../services/api';
-import { formatCurrency, parseCurrencyBR } from '../utils/formatters';
+import { centsToInput, formatCurrency, parseCurrencyBR } from '../utils/formatters';
 import type { Alert, AlertPeriod } from '../types';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -84,7 +84,7 @@ export default function Alerts() {
     setForm({
       name: alert.name,
       categoryId: alert.categoryId,
-      limitAmount: String(alert.limitAmount),
+      limitAmount: centsToInput(alert.limitAmountCents),
       period: alert.period,
       isActive: alert.isActive,
     });
@@ -106,7 +106,7 @@ export default function Alerts() {
     const payload = {
       name: form.name,
       categoryId: form.categoryId,
-      limitAmount: parseCurrencyBR(form.limitAmount),
+      limitAmountCents: parseCurrencyBR(form.limitAmount),
       period: form.period,
       isActive: form.isActive,
     };
@@ -204,7 +204,7 @@ export default function Alerts() {
                     <div className="mt-3">
                       <div className="mb-1.5 flex justify-between text-xs text-muted">
                         <span>
-                          {formatCurrency(status.currentAmount)} de {formatCurrency(alert.limitAmount)}
+                          {formatCurrency(status.currentAmountCents)} de {formatCurrency(alert.limitAmountCents)}
                           {status.isTriggered && ' · limite ultrapassado'}
                           {status.isWarning && !status.isTriggered && ' · quase no limite'}
                         </span>

@@ -1,9 +1,9 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
 RUN apk add --no-cache openssl libc6-compat
-RUN npm install -g pnpm@10
+RUN npm install -g pnpm@11.9.0
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY prisma ./prisma

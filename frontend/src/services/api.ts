@@ -11,6 +11,9 @@ import type {
   CategorySummary,
   MonthlyEvolution,
   AccountSummary,
+  PageResponse,
+  TransactionPageResponse,
+  SubscriptionPageResponse,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL
@@ -36,7 +39,7 @@ export const accountsApi = {
   getAll: () => api.get<Account[]>('/accounts').then((r) => r.data),
   create: (data: Partial<Account>) => api.post<Account>('/accounts', data).then((r) => r.data),
   update: (id: string, data: Partial<Account>) =>
-    api.put<Account>(`/accounts/${id}`, data).then((r) => r.data),
+    api.patch<Account>(`/accounts/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/accounts/${id}`),
 };
 
@@ -47,7 +50,7 @@ export const categoriesApi = {
   create: (data: Partial<Category>) =>
     api.post<Category>('/categories', data).then((r) => r.data),
   update: (id: string, data: Partial<Category>) =>
-    api.put<Category>(`/categories/${id}`, data).then((r) => r.data),
+    api.patch<Category>(`/categories/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/categories/${id}`),
 };
 
@@ -59,25 +62,30 @@ export interface TransactionFilters {
   accountId?: string;
   categoryId?: string;
   type?: string;
+  origin?: string;
+  search?: string;
 }
 
 export const transactionsApi = {
-  getAll: (filters?: TransactionFilters) =>
-    api.get<Transaction[]>('/transactions', { params: filters }).then((r) => r.data),
+  getPage: (filters?: TransactionFilters, cursor?: string | null, limit = 50) =>
+    api.get<TransactionPageResponse>('/transactions', {
+      params: { ...filters, cursor: cursor || undefined, limit },
+    }).then((r) => r.data),
   create: (data: Partial<Transaction>) =>
     api.post<Transaction>('/transactions', data).then((r) => r.data),
   update: (id: string, data: Partial<Transaction>) =>
-    api.put<Transaction>(`/transactions/${id}`, data).then((r) => r.data),
+    api.patch<Transaction>(`/transactions/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/transactions/${id}`),
 };
 
 // ─── Installments ────────────────────────────────────────────────────────────
 
 export const installmentsApi = {
-  getAll: () => api.get<InstallmentGroup[]>('/installments').then((r) => r.data),
+  getPage: (page = 1, pageSize = 25, asOf?: string) =>
+    api.get<PageResponse<InstallmentGroup>>('/installments', { params: { page, pageSize, asOf } }).then((r) => r.data),
   create: (data: {
     description: string;
-    totalAmount: number;
+    totalAmountCents: number;
     installmentCount: number;
     startDate: string;
     accountId: string;
@@ -96,11 +104,12 @@ export const installmentsApi = {
 // ─── Subscriptions ───────────────────────────────────────────────────────────
 
 export const subscriptionsApi = {
-  getAll: () => api.get<Subscription[]>('/subscriptions').then((r) => r.data),
+  getPage: (page = 1, pageSize = 25, asOf?: string) =>
+    api.get<SubscriptionPageResponse>('/subscriptions', { params: { page, pageSize, asOf } }).then((r) => r.data),
   create: (data: Partial<Subscription>) =>
     api.post<Subscription>('/subscriptions', data).then((r) => r.data),
   update: (id: string, data: Partial<Subscription>) =>
-    api.put<Subscription>(`/subscriptions/${id}`, data).then((r) => r.data),
+    api.patch<Subscription>(`/subscriptions/${id}`, data).then((r) => r.data),
   delete: (id: string, mode: 'future' | 'all' = 'future') =>
     api.delete(`/subscriptions/${id}`, { params: { mode } }),
 };
@@ -128,7 +137,7 @@ export const alertsApi = {
   check: () => api.get<AlertStatus[]>('/alerts/check').then((r) => r.data),
   create: (data: Partial<Alert>) => api.post<Alert>('/alerts', data).then((r) => r.data),
   update: (id: string, data: Partial<Alert>) =>
-    api.put<Alert>(`/alerts/${id}`, data).then((r) => r.data),
+    api.patch<Alert>(`/alerts/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/alerts/${id}`),
 };
 

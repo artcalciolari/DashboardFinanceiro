@@ -25,7 +25,7 @@ export default function MonthlyChart() {
 
   let cumulative = 0;
   const chartData = sorted.map((m) => {
-    cumulative += m.income - m.expenses;
+    cumulative += m.incomeCents - m.expensesCents;
     return { ...m, cumulative };
   });
 
@@ -64,8 +64,8 @@ export default function MonthlyChart() {
               iconType="square"
               iconSize={9}
             />
-            <Bar yAxisId="bars" dataKey="income" name="Receitas" fill="#7FC59E" radius={[4, 4, 0, 0]} barSize={18} />
-            <Bar yAxisId="bars" dataKey="expenses" name="Despesas" fill="#E0A594" radius={[4, 4, 0, 0]} barSize={18} />
+            <Bar yAxisId="bars" dataKey="incomeCents" name="Receitas" fill="#7FC59E" radius={[4, 4, 0, 0]} barSize={18} />
+            <Bar yAxisId="bars" dataKey="expensesCents" name="Despesas" fill="#E0A594" radius={[4, 4, 0, 0]} barSize={18} />
             <Line
               yAxisId="line"
               type="monotone"

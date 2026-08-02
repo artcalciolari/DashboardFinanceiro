@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
 import { subscriptionsApi, accountsApi, categoriesApi } from '../services/api';
 import { useDate } from '../context/DateContext';
-import { formatCurrency, formatDate, parseCurrencyBR } from '../utils/formatters';
+import { centsToInput, formatCurrency, formatDate, parseCurrencyBR } from '../utils/formatters';
 import type { Subscription } from '../types';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -83,41 +83,33 @@ export default function Subscriptions() {
   const [editing, setEditing] = useState<Subscription | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Subscription | null>(null);
   const [form, setForm] = useState<FormState>(createEmptyForm);
+  const [page, setPage] = useState(1);
+  const period = useMemo(() => getPeriodRange(month, year), [month, year]);
 
-  const { data: subscriptions = [], isLoading } = useQuery({
-    queryKey: ['subscriptions'],
-    queryFn: subscriptionsApi.getAll,
+  const { data, isLoading } = useQuery({
+    queryKey: ['subscriptions', page, month, year],
+    queryFn: () => subscriptionsApi.getPage(page, 25, period.end.toISOString()),
   });
+  const subscriptions = data?.items ?? [];
 
   const { data: accounts = [] } = useQuery({ queryKey: ['accounts'], queryFn: accountsApi.getAll });
   const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: categoriesApi.getAll });
 
   const expenseCategories = categories.filter((category) => category.type === 'EXPENSE');
   const selectedAccount = accounts.find((account) => account.id === form.accountId);
-  const period = useMemo(() => getPeriodRange(month, year), [month, year]);
 
   const sortedSubscriptions = subscriptions.slice().sort((a, b) => {
     const nextA =
-      a.transactions
-        ?.map((transaction) => new Date(transaction.effectiveDate).getTime())
-        .filter((time) => time > period.end.getTime())
-        .sort((left, right) => left - right)[0] ?? Number.POSITIVE_INFINITY;
+      (a.nextTransaction ? new Date(a.nextTransaction.effectiveDate).getTime() : Number.POSITIVE_INFINITY);
     const nextB =
-      b.transactions
-        ?.map((transaction) => new Date(transaction.effectiveDate).getTime())
-        .filter((time) => time > period.end.getTime())
-        .sort((left, right) => left - right)[0] ?? Number.POSITIVE_INFINITY;
+      (b.nextTransaction ? new Date(b.nextTransaction.effectiveDate).getTime() : Number.POSITIVE_INFINITY);
 
     return Number(b.isActive) - Number(a.isActive) || nextA - nextB || a.name.localeCompare(b.name);
   });
 
-  const activeCount = subscriptions.filter((s) => s.isActive).length;
-  const monthlyTotal = subscriptions
-    .filter((subscription) => subscription.isActive && !subscription.isThirdParty)
-    .reduce((sum, subscription) => sum + subscription.amount, 0);
-  const thirdPartyTotal = subscriptions
-    .filter((subscription) => subscription.isActive && subscription.isThirdParty)
-    .reduce((sum, subscription) => sum + subscription.amount, 0);
+  const activeCount = data?.summary.activeCount ?? 0;
+  const monthlyTotal = data?.summary.monthlyTotalCents ?? 0;
+  const thirdPartyTotal = data?.summary.thirdPartyTotalCents ?? 0;
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['subscriptions'] });
@@ -161,7 +153,7 @@ export default function Subscriptions() {
     setEditing(subscription);
     setForm({
       name: subscription.name,
-      amount: String(subscription.amount),
+      amount: centsToInput(subscription.amountCents),
       startDate: toInputDate(subscription.startDate),
       endDate: toInputDate(subscription.endDate),
       billingDay: String(subscription.billingDay),
@@ -189,7 +181,7 @@ export default function Subscriptions() {
 
     const payload = {
       name: form.name,
-      amount: parseCurrencyBR(form.amount),
+      amountCents: parseCurrencyBR(form.amount),
       startDate: toIsoDate(form.startDate),
       endDate: form.endDate ? toIsoDate(form.endDate) : null,
       billingDay: parseInt(form.billingDay),
@@ -238,10 +230,7 @@ export default function Subscriptions() {
       ) : (
         <div className="overflow-hidden rounded-card border border-border bg-card">
           {sortedSubscriptions.map((subscription) => {
-            const transactions = subscription.transactions ?? [];
-            const nextTransaction = transactions.find(
-              (transaction) => new Date(transaction.effectiveDate) > period.end
-            );
+            const nextTransaction = subscription.nextTransaction ?? null;
 
             return (
               <div
@@ -275,7 +264,7 @@ export default function Subscriptions() {
                   </div>
                 </div>
                 <div className="tabular flex-shrink-0 font-display text-[16px] font-bold text-ink">
-                  {formatCurrency(subscription.amount)}
+                  {formatCurrency(subscription.amountCents)}
                 </div>
                 <div className="ml-2 flex flex-shrink-0 gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
                   <button
@@ -298,6 +287,23 @@ export default function Subscriptions() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {(data?.pagination.totalPages ?? 0) > 1 && (
+        <div className="mt-4 flex items-center justify-center gap-3">
+          <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
+            Anterior
+          </Button>
+          <span className="text-xs text-faint">Página {page} de {data?.pagination.totalPages}</span>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={page >= (data?.pagination.totalPages ?? 1)}
+            onClick={() => setPage((value) => value + 1)}
+          >
+            Próxima
+          </Button>
         </div>
       )}
 

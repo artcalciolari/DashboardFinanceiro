@@ -2,11 +2,11 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { AccountType, CategoryType } from '../types';
 
-export function formatCurrency(value: number): string {
+export function formatCurrency(cents: number): string {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
-  }).format(value);
+  }).format(cents / 100);
 }
 
 export function formatDate(dateStr: string): string {
@@ -27,10 +27,28 @@ export function parseCurrencyBR(value: string): number {
 
   if (lastComma > lastDot) {
     const intPart = cleaned.slice(0, lastComma).replace(/[.,]/g, '');
-    return parseFloat(`${intPart}.${cleaned.slice(lastComma + 1)}`);
+    return decimalStringToCents(`${intPart}.${cleaned.slice(lastComma + 1)}`);
   }
 
-  return parseFloat(cleaned.replace(/,/g, ''));
+  return decimalStringToCents(cleaned.replace(/,/g, ''));
+}
+
+function decimalStringToCents(value: string): number {
+  if (!/^-?\d+(?:\.\d+)?$/.test(value)) return NaN;
+  const negative = value.startsWith('-');
+  const normalized = negative ? value.slice(1) : value;
+  const [integer, fraction = ''] = normalized.split('.');
+  const rounded = Number(fraction.padEnd(3, '0').slice(0, 3));
+  let cents = Number(integer) * 100 + Number(fraction.padEnd(2, '0').slice(0, 2));
+  if (rounded % 10 >= 5) cents += 1;
+  return negative ? -cents : cents;
+}
+
+export function centsToInput(cents: number | null | undefined): string {
+  if (cents === null || cents === undefined) return '';
+  const sign = cents < 0 ? '-' : '';
+  const absolute = Math.abs(cents);
+  return `${sign}${Math.floor(absolute / 100)}.${String(absolute % 100).padStart(2, '0')}`;
 }
 
 export function getLocalDateInput(date = new Date()): string {

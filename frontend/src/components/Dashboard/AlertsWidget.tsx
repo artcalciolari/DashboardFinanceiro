@@ -45,7 +45,7 @@ export default function AlertsWidget() {
                     <span className="text-sm font-medium text-ink">{alert.name}</span>
                   </div>
                   <span className="text-xs text-faint">
-                    {formatCurrency(alert.currentAmount)} / {formatCurrency(alert.limitAmount)}
+                    {formatCurrency(alert.currentAmountCents)} / {formatCurrency(alert.limitAmountCents)}
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-pill bg-chip">

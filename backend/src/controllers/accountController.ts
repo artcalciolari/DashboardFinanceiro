@@ -1,16 +1,23 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
-import { resetSubscriptionTransactionHorizon } from '../services/subscriptionService';
+import {
+  ensureSubscriptionTransactions,
+  getSubscriptionHorizon,
+  resetSubscriptionTransactionHorizon,
+} from '../services/subscriptionService';
+import { MoneyCents, PositiveMoneyCents } from '../utils/money';
+import { mutablePeriodStart } from '../utils/businessTime';
+import { recalculateAccountEffectiveDates } from '../services/accountCycleService';
 
 const AccountSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   type: z.enum(['BANK_ACCOUNT', 'CREDIT_CARD', 'CASH', 'INVESTMENT']),
-  balance: z.number().default(0),
+  openingBalanceCents: MoneyCents.default(0),
   color: z.string().default('#3B82F6'),
-  creditLimit: z.number().positive().nullable().optional(),
-  closingDay: z.number().min(1).max(31).nullable().optional(),
-  dueDay: z.number().min(1).max(31).nullable().optional(),
+  creditLimitCents: PositiveMoneyCents.nullable().optional(),
+  closingDay: z.number().int().min(1).max(31).nullable().optional(),
+  dueDay: z.number().int().min(1).max(31).nullable().optional(),
 });
 
 type AccountInput = z.infer<typeof AccountSchema>;
@@ -21,12 +28,12 @@ function normalizeAccountData<T extends PartialAccountInput>(
   accountType: AccountInput['type']
 ) {
   if (accountType === 'CREDIT_CARD') {
-    return { ...data, balance: 0 };
+    return { ...data, openingBalanceCents: 0 };
   }
 
   return {
     ...data,
-    creditLimit: null,
+    creditLimitCents: null,
     closingDay: null,
     dueDay: null,
   };
@@ -63,14 +70,16 @@ export async function updateAccount(req: Request, res: Response, next: NextFunct
       data: normalizeAccountData(data, accountType),
     });
 
-    // Fechamento/vencimento alteram a effectiveDate das cobranças futuras de
-    // assinatura; sem o reset, o cache de horizonte impede o recálculo.
+    // Recalcula apenas o período mutável de transações manuais, parcelas e
+    // assinaturas; meses fechados permanecem intactos.
     if (
       account.type !== existing.type ||
       account.closingDay !== existing.closingDay ||
       account.dueDay !== existing.dueDay
     ) {
+      await recalculateAccountEffectiveDates(account.id, mutablePeriodStart());
       resetSubscriptionTransactionHorizon();
+      await ensureSubscriptionTransactions(getSubscriptionHorizon());
     }
 
     res.json(account);

@@ -1,0 +1,7 @@
+services:
+  frontend:
+    ports: !override
+      - "${DASHBOARD_BIND_ADDRESS:-0.0.0.0}:80:80"
+    volumes:
+      - ./frontend/nginx.secure.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/.htpasswd:/etc/nginx/.htpasswd:ro

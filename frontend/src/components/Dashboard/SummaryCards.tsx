@@ -20,9 +20,9 @@ export default function SummaryCards() {
     queryFn: summaryApi.getEvolution,
   });
 
-  const { data: transactions = [] } = useQuery({
-    queryKey: ['transactions', month, year],
-    queryFn: () => transactionsApi.getAll({ month, year }),
+  const { data: incomePage } = useQuery({
+    queryKey: ['transactions', 'income-count', month, year],
+    queryFn: () => transactionsApi.getPage({ month, year, type: 'INCOME' }, null, 1),
   });
 
   const sortedEvolution = evolution
@@ -31,13 +31,13 @@ export default function SummaryCards() {
 
   let cumulative = 0;
   const sparkPoints = sortedEvolution.map((m) => {
-    cumulative += m.income - m.expenses;
+    cumulative += m.incomeCents - m.expensesCents;
     return cumulative;
   });
   const currentIdx = sortedEvolution.findIndex((m) => m.month === month && m.year === year);
   const previous = currentIdx > 0 ? sortedEvolution[currentIdx - 1] : undefined;
-  const currentBalance = data?.balance ?? 0;
-  const previousBalance = previous ? previous.income - previous.expenses : undefined;
+  const currentBalance = data?.balanceCents ?? 0;
+  const previousBalance = previous ? previous.incomeCents - previous.expensesCents : undefined;
   const balanceDiff = previousBalance !== undefined ? currentBalance - previousBalance : undefined;
   const pctChange =
     previousBalance !== undefined && previousBalance !== 0
@@ -58,7 +58,7 @@ export default function SummaryCards() {
     })
     .join(' ');
 
-  const incomeCount = transactions.filter((t) => t.type === 'INCOME').length;
+  const incomeCount = incomePage?.totalCount ?? 0;
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
@@ -110,7 +110,7 @@ export default function SummaryCards() {
         </div>
         <div>
           <div className="tabular mt-4 whitespace-nowrap font-display text-[27px] font-bold tracking-tight text-income">
-            {isLoading ? '—' : formatCurrency(data?.totalIncome ?? 0)}
+            {isLoading ? '—' : formatCurrency(data?.totalIncomeCents ?? 0)}
           </div>
           <div className="mt-0.5 text-[12.5px] text-faint">
             {incomeCount} entrada{incomeCount === 1 ? '' : 's'} no mês
@@ -128,10 +128,10 @@ export default function SummaryCards() {
         </div>
         <div>
           <div className="tabular mt-4 whitespace-nowrap font-display text-[27px] font-bold tracking-tight text-expense">
-            {isLoading ? '—' : formatCurrency(data?.totalExpenses ?? 0)}
+            {isLoading ? '—' : formatCurrency(data?.totalExpensesCents ?? 0)}
           </div>
           <div className="mt-0.5 text-[12.5px] text-faint">
-            Fatura total: {formatCurrency(data?.invoiceExpenses ?? 0)}
+            Fatura total: {formatCurrency(data?.invoiceExpensesCents ?? 0)}
           </div>
         </div>
       </div>

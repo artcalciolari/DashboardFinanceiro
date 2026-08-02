@@ -12,10 +12,10 @@ export default function CategoryChart() {
   });
 
   const expenseData = data
-    .filter((d) => d.type === 'EXPENSE' && d.total > 0)
-    .sort((a, b) => b.total - a.total);
-  const totalExpenses = expenseData.reduce((sum, item) => sum + item.total, 0);
-  const maxValue = expenseData.length ? expenseData[0].total : 0;
+    .filter((item) => item.type === 'EXPENSE' && item.totalCents > 0)
+    .sort((a, b) => b.totalCents - a.totalCents);
+  const totalExpenses = expenseData.reduce((sum, item) => sum + item.totalCents, 0);
+  const maxValue = expenseData.length ? expenseData[0].totalCents : 0;
 
   return (
     <div className="card">
@@ -46,14 +46,14 @@ export default function CategoryChart() {
                   {item.category.name}
                 </span>
                 <span className="tabular text-[13px] font-semibold text-ink">
-                  {formatCurrency(item.total)}
+                  {formatCurrency(item.totalCents)}
                 </span>
               </div>
               <div className="h-[7px] overflow-hidden rounded-pill bg-chip">
                 <div
                   className="h-full rounded-pill transition-all"
                   style={{
-                    width: `${maxValue > 0 ? Math.round((item.total / maxValue) * 100) : 0}%`,
+                    width: `${maxValue > 0 ? Math.round((item.totalCents / maxValue) * 100) : 0}%`,
                     backgroundColor: item.category.color,
                   }}
                 />

@@ -8,14 +8,14 @@ datasource db {
 }
 
 model Account {
-  id          String      @id @default(cuid())
-  name        String
-  type        AccountType
-  balance     Float       @default(0)
-  color       String      @default("#3B82F6")
-  creditLimit Float?      // Para cartão: limite total disponível/informativo
-  closingDay  Int?        // Para cartão: dia de fechamento da fatura
-  dueDay      Int?        // Para cartão: dia de vencimento da fatura
+  id                  String      @id @default(cuid())
+  name                String
+  type                AccountType
+  openingBalanceCents Int         @default(0)
+  color               String      @default("#3B82F6")
+  creditLimitCents    Int? // Para cartão: limite total informativo, em centavos
+  closingDay          Int? // Para cartão: dia de fechamento da fatura
+  dueDay              Int? // Para cartão: dia de vencimento da fatura
 
   transactions      Transaction[]
   installmentGroups InstallmentGroup[]
@@ -54,12 +54,12 @@ enum CategoryType {
 }
 
 model Transaction {
-  id          String          @id @default(cuid())
-  description String
-  amount      Float
-  type        TransactionType
-  date        DateTime        // Data real da compra
-  effectiveDate DateTime      // Data efetiva (ajustada pelo fechamento do cartão)
+  id            String          @id @default(cuid())
+  description   String
+  amountCents   Int
+  type          TransactionType
+  date          DateTime // Data real da compra
+  effectiveDate DateTime // Data efetiva (ajustada pelo fechamento do cartão)
 
   accountId  String
   account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
@@ -70,19 +70,25 @@ model Transaction {
   installmentGroup   InstallmentGroup? @relation(fields: [installmentGroupId], references: [id], onDelete: SetNull)
   installmentNumber  Int?
   totalInstallments  Int?
-  subscriptionId      String?
-  subscription        Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
-  subscriptionYear    Int?
-  subscriptionMonth   Int?
+  subscriptionId     String?
+  subscription       Subscription?     @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  subscriptionYear   Int?
+  subscriptionMonth  Int?
 
-  isThirdParty  Boolean @default(false)
+  isThirdParty   Boolean @default(false)
   thirdPartyName String?
-  isReimbursed  Boolean @default(false)
+  isReimbursed   Boolean @default(false)
 
   notes String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([subscriptionId, subscriptionYear, subscriptionMonth])
+  @@index([effectiveDate, id])
+  @@index([accountId, effectiveDate])
+  @@index([categoryId, effectiveDate])
+  @@index([installmentGroupId, installmentNumber])
 }
 
 enum TransactionType {
@@ -91,15 +97,15 @@ enum TransactionType {
 }
 
 model InstallmentGroup {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   description      String
-  totalAmount      Float
+  totalAmountCents Int
   installmentCount Int
   startDate        DateTime
-  isThirdParty     Boolean  @default(false)
+  isThirdParty     Boolean   @default(false)
   thirdPartyName   String?
-  isReimbursed     Boolean  @default(false)
-  isCancelled      Boolean  @default(false)
+  isReimbursed     Boolean   @default(false)
+  isCancelled      Boolean   @default(false)
   cancelledAt      DateTime?
 
   accountId  String
@@ -111,19 +117,22 @@ model InstallmentGroup {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([accountId])
+  @@index([categoryId])
 }
 
 model Subscription {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   name           String
-  amount         Float
+  amountCents    Int
   startDate      DateTime
   endDate        DateTime?
   billingDay     Int
-  isActive       Boolean  @default(true)
-  isThirdParty   Boolean  @default(false)
+  isActive       Boolean   @default(true)
+  isThirdParty   Boolean   @default(false)
   thirdPartyName String?
-  isReimbursed   Boolean  @default(false)
+  isReimbursed   Boolean   @default(false)
   notes          String?
 
   accountId  String
@@ -135,19 +144,25 @@ model Subscription {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([isActive, startDate])
+  @@index([accountId])
+  @@index([categoryId])
 }
 
 model Alert {
-  id          String      @id @default(cuid())
-  name        String
-  categoryId  String
-  category    Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  limitAmount Float
-  period      AlertPeriod
-  isActive    Boolean     @default(true)
+  id               String      @id @default(cuid())
+  name             String
+  categoryId       String
+  category         Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  limitAmountCents Int
+  period           AlertPeriod
+  isActive         Boolean     @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
 }
 
 enum AlertPeriod {

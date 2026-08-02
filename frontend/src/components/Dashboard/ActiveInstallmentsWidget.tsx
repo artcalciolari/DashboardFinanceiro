@@ -17,13 +17,8 @@ interface ActiveInstallmentView {
   remainingAmount: number;
 }
 
-function buildActiveInstallment(group: InstallmentGroup, periodEnd: Date): ActiveInstallmentView {
-  const transactions = group.transactions.slice().sort((a, b) => {
-    const dateDiff = new Date(a.effectiveDate).getTime() - new Date(b.effectiveDate).getTime();
-    return dateDiff || (a.installmentNumber ?? 0) - (b.installmentNumber ?? 0);
-  });
-  const futureTransactions = transactions.filter((t) => new Date(t.effectiveDate) > periodEnd);
-  const paid = transactions.length - futureTransactions.length;
+function buildActiveInstallment(group: InstallmentGroup): ActiveInstallmentView {
+  const paid = group.paidCount ?? 0;
   const total = group.installmentCount;
   const pct = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
 
@@ -32,8 +27,8 @@ function buildActiveInstallment(group: InstallmentGroup, periodEnd: Date): Activ
     paid,
     total,
     pct,
-    next: futureTransactions[0],
-    remainingAmount: futureTransactions.reduce((sum, t) => sum + t.amount, 0),
+    next: group.nextTransaction ?? undefined,
+    remainingAmount: group.remainingAmountCents ?? 0,
   };
 }
 
@@ -44,14 +39,15 @@ export default function ActiveInstallmentsWidget() {
     [month, year]
   );
 
-  const { data: groups = [], isLoading } = useQuery({
-    queryKey: ['installments'],
-    queryFn: installmentsApi.getAll,
+  const { data, isLoading } = useQuery({
+    queryKey: ['installments', 'dashboard', month, year],
+    queryFn: () => installmentsApi.getPage(1, 100, selectedPeriodEnd.toISOString()),
   });
+  const groups = data?.items ?? [];
 
   const activeInstallments = useMemo(() => {
     return groups
-      .map((group) => buildActiveInstallment(group, selectedPeriodEnd))
+      .map(buildActiveInstallment)
       .filter((view) => view.total > 0 && view.paid < view.total)
       .sort((a, b) => {
         const nextA = a.next ? new Date(a.next.effectiveDate).getTime() : Number.POSITIVE_INFINITY;
@@ -59,7 +55,7 @@ export default function ActiveInstallmentsWidget() {
 
         return nextA - nextB || a.group.description.localeCompare(b.group.description);
       });
-  }, [groups, selectedPeriodEnd]);
+  }, [groups]);
 
   const visibleInstallments = activeInstallments.slice(0, 5);
   const remainingTotal = activeInstallments.reduce((sum, view) => sum + view.remainingAmount, 0);

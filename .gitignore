@@ -3,10 +3,13 @@ dist/
 build/
 coverage/
 postgres_data/
+backups/
 
 .env
 .env.*
 !.env.example
 
 *.log
+.htpasswd
+deploy/.htpasswd
 .DS_Store

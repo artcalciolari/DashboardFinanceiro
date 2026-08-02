@@ -9,7 +9,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
 import FormError from '../ui/FormError';
-import { getLocalDateInput, parseCurrencyBR } from '../../utils/formatters';
+import { centsToInput, getLocalDateInput, parseCurrencyBR } from '../../utils/formatters';
 
 interface FormState {
   description: string;
@@ -42,7 +42,7 @@ function createEmptyForm(): FormState {
 function formFromTransaction(t: Transaction): FormState {
   return {
     description: t.description,
-    amount: String(t.amount),
+    amount: centsToInput(t.amountCents),
     type: t.type,
     date: t.date.slice(0, 10),
     accountId: t.accountId,
@@ -93,7 +93,7 @@ export default function TransactionFormModal() {
     e.preventDefault();
     const payload = {
       description: form.description,
-      amount: parseCurrencyBR(form.amount),
+      amountCents: parseCurrencyBR(form.amount),
       type: form.type,
       date: new Date(form.date + 'T12:00:00').toISOString(),
       accountId: form.accountId,

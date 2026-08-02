@@ -1,0 +1,38 @@
+name: Deploy production
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 30
+    environment: production
+    env:
+      DEPLOY_DIR: /home/arthur/dashboard-financeiro
+      COMPOSE_PROJECT_NAME: dashboard-financeiro
+    steps:
+      - name: Check out verified revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Deploy with backup and migration gates
+        env:
+          SOURCE_DIR: ${{ github.workspace }}
+        run: bash deploy/deploy.sh

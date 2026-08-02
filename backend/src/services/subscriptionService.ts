@@ -2,10 +2,10 @@ import { addMonths } from 'date-fns';
 import type { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { calculateEffectiveDate } from '../utils/creditCard';
+import { mutablePeriodStart } from '../utils/businessTime';
 
-// This application runs a single personal backend instance. Serialising this
-// materialisation prevents simultaneous dashboard requests from generating the
-// same recurring occurrence before either request can see the other's insert.
+// Serialising avoids redundant work inside one process. Database uniqueness and
+// createMany(skipDuplicates) provide correctness across multiple instances.
 let synchronizationQueue: Promise<void> = Promise.resolve();
 let synchronizedThrough: Date | null = null;
 
@@ -30,10 +30,6 @@ function endOfDay(date: Date) {
 
 function isSameMonth(left: Date, right: Date) {
   return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth();
-}
-
-function hasNoManualUpdates(createdAt: Date, updatedAt: Date) {
-  return Math.abs(updatedAt.getTime() - createdAt.getTime()) < 1000;
 }
 
 export function getSubscriptionHorizon(monthsAhead = 12) {
@@ -61,7 +57,7 @@ export function ensureSubscriptionTransactions(untilDate: Date) {
 }
 
 async function synchronizeSubscriptionTransactions(untilDate: Date) {
-  const mutableFrom = new Date(new Date().getFullYear(), new Date().getMonth(), 1, 0, 0, 0, 0);
+  const mutableFrom = mutablePeriodStart();
   const subscriptions = await prisma.subscription.findMany({
     where: {
       isActive: true,
@@ -85,9 +81,14 @@ async function synchronizeSubscriptionTransactions(untilDate: Date) {
       id: true,
       date: true,
       effectiveDate: true,
+      description: true,
+      amountCents: true,
+      accountId: true,
+      categoryId: true,
+      isThirdParty: true,
+      thirdPartyName: true,
       isReimbursed: true,
-      createdAt: true,
-      updatedAt: true,
+      notes: true,
     },
   });
   const existingTransactionsByKey = new Map<string, (typeof existingTransactions)[number]>(
@@ -145,7 +146,21 @@ async function synchronizeSubscriptionTransactions(untilDate: Date) {
             continue;
           }
 
-          const updateData: Prisma.TransactionUpdateInput = {};
+          const updateData: Prisma.TransactionUncheckedUpdateInput = {};
+          const expectedDescription = `${subscription.name} (${String(month).padStart(2, '0')}/${year})`;
+
+          if (existingTransaction.description !== expectedDescription) updateData.description = expectedDescription;
+          if (existingTransaction.amountCents !== subscription.amountCents) updateData.amountCents = subscription.amountCents;
+          if (existingTransaction.accountId !== subscription.accountId) updateData.accountId = subscription.accountId;
+          if (existingTransaction.categoryId !== subscription.categoryId) updateData.categoryId = subscription.categoryId;
+          if (existingTransaction.isThirdParty !== subscription.isThirdParty) {
+            updateData.isThirdParty = subscription.isThirdParty;
+          }
+          const expectedThirdPartyName = subscription.isThirdParty ? subscription.thirdPartyName : null;
+          if (existingTransaction.thirdPartyName !== expectedThirdPartyName) {
+            updateData.thirdPartyName = expectedThirdPartyName;
+          }
+          if (existingTransaction.notes !== subscription.notes) updateData.notes = subscription.notes;
 
           if (existingTransaction.date.getTime() !== purchaseDate.getTime()) {
             updateData.date = purchaseDate;
@@ -153,14 +168,8 @@ async function synchronizeSubscriptionTransactions(untilDate: Date) {
           if (existingTransaction.effectiveDate.getTime() !== effectiveDate.getTime()) {
             updateData.effectiveDate = effectiveDate;
           }
-          if (
-            !isInitialOccurrence &&
-            subscription.isThirdParty &&
-            subscription.isReimbursed &&
-            existingTransaction.isReimbursed &&
-            hasNoManualUpdates(existingTransaction.createdAt, existingTransaction.updatedAt)
-          ) {
-            updateData.isReimbursed = false;
+          if (existingTransaction.isReimbursed !== expectedIsReimbursed) {
+            updateData.isReimbursed = expectedIsReimbursed;
           }
 
           if (Object.keys(updateData).length > 0) {
@@ -178,7 +187,7 @@ async function synchronizeSubscriptionTransactions(untilDate: Date) {
 
         occurrences.push({
           description: `${subscription.name} (${String(month).padStart(2, '0')}/${year})`,
-          amount: subscription.amount,
+          amountCents: subscription.amountCents,
           type: 'EXPENSE' as const,
           date: purchaseDate,
           effectiveDate,
@@ -206,6 +215,7 @@ async function synchronizeSubscriptionTransactions(untilDate: Date) {
     writeOperations.push(
       prisma.transaction.createMany({
         data: transactionsData,
+        skipDuplicates: true,
       })
     );
   }

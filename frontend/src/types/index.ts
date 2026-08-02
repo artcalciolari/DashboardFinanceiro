@@ -3,13 +3,39 @@ export type CategoryType = 'INCOME' | 'EXPENSE';
 export type TransactionType = 'INCOME' | 'EXPENSE';
 export type AlertPeriod = 'MONTHLY' | 'WEEKLY';
 
+export interface Pagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PageResponse<T> {
+  items: T[];
+  pagination: Pagination;
+}
+
+export interface SubscriptionPageResponse extends PageResponse<Subscription> {
+  summary: { activeCount: number; monthlyTotalCents: number; thirdPartyTotalCents: number };
+}
+
+export interface CursorPageResponse<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+export interface TransactionPageResponse extends CursorPageResponse<Transaction> {
+  totalCount: number;
+  totals: { incomeCents: number; expenseCents: number };
+}
+
 export interface Account {
   id: string;
   name: string;
   type: AccountType;
-  balance: number;
+  openingBalanceCents: number;
   color: string;
-  creditLimit?: number | null;
+  creditLimitCents?: number | null;
   closingDay?: number | null;
   dueDay?: number | null;
   createdAt: string;
@@ -29,7 +55,7 @@ export interface Category {
 export interface Transaction {
   id: string;
   description: string;
-  amount: number;
+  amountCents: number;
   type: TransactionType;
   date: string;
   effectiveDate: string;
@@ -55,7 +81,7 @@ export interface Transaction {
 export interface InstallmentGroup {
   id: string;
   description: string;
-  totalAmount: number;
+  totalAmountCents: number;
   installmentCount: number;
   startDate: string;
   isThirdParty: boolean;
@@ -67,7 +93,16 @@ export interface InstallmentGroup {
   account: Account;
   categoryId: string;
   category: Category;
-  transactions: Transaction[];
+  transactions?: Transaction[];
+  paidCount?: number;
+  futureCount?: number;
+  historicalCount?: number;
+  deletableFutureCount?: number;
+  remainingAmountCents?: number;
+  installmentAmountCents?: number;
+  firstTransaction?: Transaction | null;
+  nextTransaction?: Transaction | null;
+  lastTransaction?: Transaction | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -75,7 +110,7 @@ export interface InstallmentGroup {
 export interface Subscription {
   id: string;
   name: string;
-  amount: number;
+  amountCents: number;
   startDate: string;
   endDate?: string | null;
   billingDay: number;
@@ -88,7 +123,9 @@ export interface Subscription {
   account: Account;
   categoryId: string;
   category: Category;
-  transactions: Transaction[];
+  transactions?: Transaction[];
+  occurrenceCount?: number;
+  nextTransaction?: Transaction | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -98,7 +135,7 @@ export interface Alert {
   name: string;
   categoryId: string;
   category: Category;
-  limitAmount: number;
+  limitAmountCents: number;
   period: AlertPeriod;
   isActive: boolean;
   createdAt: string;
@@ -106,19 +143,19 @@ export interface Alert {
 }
 
 export interface AlertStatus extends Alert {
-  currentAmount: number;
+  currentAmountCents: number;
   percentage: number;
   isTriggered: boolean;
   isWarning: boolean;
 }
 
 export interface MonthlySummary {
-  totalIncome: number;
-  totalExpenses: number;
-  invoiceExpenses: number;
-  thirdPartyExpenses: number;
-  receivableAmount: number;
-  balance: number;
+  totalIncomeCents: number;
+  totalExpensesCents: number;
+  invoiceExpensesCents: number;
+  thirdPartyExpensesCents: number;
+  receivableAmountCents: number;
+  balanceCents: number;
   month: number;
   year: number;
 }
@@ -126,23 +163,23 @@ export interface MonthlySummary {
 export interface CategorySummary {
   category: Category;
   type: TransactionType;
-  total: number;
+  totalCents: number;
 }
 
 export interface MonthlyEvolution {
   month: number;
   year: number;
   label: string;
-  income: number;
-  expenses: number;
+  incomeCents: number;
+  expensesCents: number;
 }
 
 export interface AccountSummary {
   account: Account;
-  income: number;
-  expenses: number;
-  invoiceExpenses: number;
-  thirdPartyExpenses: number;
-  receivableAmount: number;
-  net: number;
+  incomeCents: number;
+  expensesCents: number;
+  invoiceExpensesCents: number;
+  thirdPartyExpensesCents: number;
+  receivableCents: number;
+  netCents: number;
 }

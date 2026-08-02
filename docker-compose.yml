@@ -28,13 +28,21 @@ services:
       DATABASE_URL: postgresql://${DB_USER:?DB_USER is required}:${DB_PASSWORD:?DB_PASSWORD is required}@postgres:5432/${DB_NAME:?DB_NAME is required}
       NODE_ENV: production
       PORT: 3001
-    ports:
-      - "127.0.0.1:3001:3001"
+      HOST: 0.0.0.0
+      BUSINESS_TIME_ZONE: ${BUSINESS_TIME_ZONE:-America/Sao_Paulo}
+      TZ: ${BUSINESS_TIME_ZONE:-America/Sao_Paulo}
+    expose:
+      - "3001"
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - financeiro_network
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   frontend:
@@ -45,9 +53,10 @@ services:
         VITE_API_URL: ${VITE_API_URL:-}
     container_name: financeiro_frontend
     ports:
-      - "127.0.0.1:3000:80"
+      - "${DASHBOARD_BIND_ADDRESS:-127.0.0.1}:3000:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - financeiro_network
     restart: unless-stopped
