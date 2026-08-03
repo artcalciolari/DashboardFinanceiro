@@ -1,5 +1,5 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Header from './Header';
 import { renderWithProviders } from '@/test/test-utils';
@@ -90,6 +90,21 @@ describe('Header', () => {
     await user.click(screen.getByRole('button', { name: /Exportar/i }));
     expect(window.open).toHaveBeenCalled();
     expect(getCSVUrl).toHaveBeenCalled();
+  });
+
+  it('focuses search with Ctrl+K or Cmd+K, ignores other keys', () => {
+    renderWithProviders(<Header />, { routerProps: { initialEntries: ['/transactions'] } });
+    const search = screen.getByLabelText('Buscar transações');
+
+    fireEvent.keyDown(window, { key: 'k' });
+    expect(search).not.toHaveFocus();
+
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    expect(search).toHaveFocus();
+    search.blur();
+
+    fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    expect(search).toHaveFocus();
   });
 
   it('hides period/search/export on accounts page', () => {

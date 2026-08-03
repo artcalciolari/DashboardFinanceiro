@@ -301,7 +301,7 @@ export default function Transactions() {
             {filtered.map((t) => (
               <div
                 key={t.id}
-                className="group flex items-center gap-4 border-b border-border-faint px-5 py-4 transition-colors duration-150 last:border-b-0 hover:bg-[#FAF9F5]"
+                className="group flex items-center gap-4 border-b border-border-faint px-5 py-4 transition-colors duration-150 last:border-b-0 hover:bg-paper"
               >
                 <div
                   className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[12px]"
@@ -313,7 +313,7 @@ export default function Transactions() {
                   <p className="truncate text-[13.5px] font-semibold text-ink">{t.description}</p>
                   <div className="mt-0.5 flex flex-wrap items-center gap-2">
                     <span className="text-xs text-faint">{t.category.name}</span>
-                    <span className="h-[3px] w-[3px] rounded-full bg-[#CFCABC]" />
+                    <span className="h-[3px] w-[3px] rounded-full bg-[#CBD4DA]" />
                     <span className="text-xs text-faint">{t.account.name}</span>
                     {t.installmentNumber && (
                       <span className="rounded-pill bg-forest-soft px-2 py-0.5 text-[11px] font-semibold text-forest">

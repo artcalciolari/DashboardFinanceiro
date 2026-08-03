@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
 import { transactionsApi, accountsApi, categoriesApi } from '../../services/api';
@@ -120,7 +120,7 @@ export default function TransactionFormModal() {
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title={editing ? 'Editar transação' : 'Nova transação'}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="inline-flex w-full gap-0.5 rounded-xl bg-[#EDEAE0] p-1">
+        <div className="inline-flex w-full gap-0.5 rounded-xl bg-chip p-1">
           <button
             type="button"
             onClick={() =>
@@ -263,7 +263,7 @@ export default function TransactionFormModal() {
         />
         <FormError error={mutationError} />
         {selectedAccount?.type === 'CREDIT_CARD' && (
-          <div className="rounded-xl bg-[#E9F0EC] p-2.5 text-xs text-forest">
+          <div className="rounded-xl bg-forest-soft p-2.5 text-xs text-forest">
             {selectedAccount.closingDay
               ? `Fechamento no dia ${selectedAccount.closingDay}. A data efetiva será calculada automaticamente.`
               : 'Configure o dia de fechamento da conta para cálculo automático da data efetiva.'}

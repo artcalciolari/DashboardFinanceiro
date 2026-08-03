@@ -1,10 +1,12 @@
-﻿import { ChevronLeft, ChevronRight, Download, Search, Plus } from 'lucide-react';
+﻿import { useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight, Download, Search, Plus } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useDate } from '../../context/DateContext';
 import { useSearch } from '../../context/SearchContext';
 import { useTransactionModal } from '../../context/TransactionModalContext';
 import { formatMonthYear } from '../../utils/formatters';
 import { exportApi } from '../../services/api';
+import Button from '../ui/Button';
 
 export default function Header() {
   const { pathname } = useLocation();
@@ -18,6 +20,19 @@ export default function Header() {
   const showsPeriod = ['/', '/transactions', '/installments', '/subscriptions'].includes(pathname);
   const showsSearch = pathname === '/transactions';
   const showsExport = pathname === '/' || pathname === '/transactions';
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!showsSearch) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchRef.current!.focus();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showsSearch]);
 
   function prevMonth() {
     if (month === 1) {
@@ -86,14 +101,15 @@ export default function Header() {
       {showsSearch && <div className="relative hidden w-[280px] max-w-[34vw] md:block">
         <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
         <input
+          ref={searchRef}
           type="text"
           placeholder="Buscar transações…"
           aria-label="Buscar transações"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="h-10 w-full rounded-control border border-border bg-white pl-9 pr-12 text-[13.5px] text-ink outline-none transition-shadow focus:border-forest focus:shadow-focus-forest"
+          className="h-10 w-full rounded-control border border-border bg-white pl-9 pr-[4.5rem] text-[13.5px] text-ink outline-none transition-shadow focus:border-forest focus:shadow-focus-forest"
         />
-        <span className="kbd pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" aria-hidden="true">⌘K</span>
+        <span className="kbd pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" aria-hidden="true">Ctrl K</span>
       </div>}
 
       <div className="ml-auto flex w-full items-center justify-end gap-2 md:ml-0 md:w-auto">
@@ -106,14 +122,14 @@ export default function Header() {
         <span className="hidden sm:inline">Exportar</span>
       </button>}
 
-      <button
-        type="button"
+      <Button
+        variant="accent"
         onClick={openCreate}
-        className="flex h-10 flex-shrink-0 items-center gap-1.5 rounded-control bg-lime px-4 text-[13.5px] font-bold text-forest shadow-card transition-all duration-150 hover:bg-lime-strong active:scale-[0.98]"
+        className="flex-shrink-0 gap-1.5 font-bold"
       >
         <Plus size={17} />
         <span className="hidden sm:inline">Nova transação</span>
-      </button>
+      </Button>
       </div>
     </header>
   );

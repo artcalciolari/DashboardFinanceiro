@@ -27,8 +27,8 @@
   }
 
   ::selection {
-    background: #C8F169;
-    color: #0B3529;
+    background: #7DE8FA;
+    color: #0B3A5C;
   }
 
   ::-webkit-scrollbar {
@@ -45,7 +45,7 @@
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #D8D5C9;
+    background: #D0D9DE;
   }
 
   @keyframes sc-rise {
@@ -82,11 +82,6 @@
     @apply bg-card rounded-card border border-border shadow-card p-6;
   }
 
-  /* Interactive card (whole card is clickable / hoverable) */
-  .card-interactive {
-    @apply card transition-all duration-150 ease-out-expo hover:shadow-card-hover hover:-translate-y-px hover:border-[#DDDAD0];
-  }
-
   .btn-primary {
     @apply bg-forest hover:bg-forest-hover text-white font-semibold py-2.5 px-4 rounded-control shadow-card transition-all duration-150 active:scale-[0.98];
   }
@@ -97,11 +92,6 @@
 
   .btn-danger {
     @apply bg-expense/10 hover:bg-expense/20 text-expense font-semibold py-2.5 px-4 rounded-control transition-all duration-150 active:scale-[0.98];
-  }
-
-  /* Accent action — use sparingly: header CTA, empty-state CTA */
-  .btn-accent {
-    @apply bg-lime hover:bg-lime-strong text-forest font-semibold py-2.5 px-4 rounded-control shadow-card transition-all duration-150 active:scale-[0.98];
   }
 
   .input {

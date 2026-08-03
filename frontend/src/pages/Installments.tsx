@@ -286,7 +286,7 @@ export default function Installments() {
                   ? 'bg-chip text-muted'
                   : isFinished
                     ? 'bg-income/10 text-income'
-                    : 'bg-[#E9F0EC] text-forest'
+                    : 'bg-forest-soft text-forest'
               )}
             >
               {isCancelled ? 'Cancelado' : isFinished ? 'Finalizado' : 'Ativo'}
@@ -366,6 +366,7 @@ export default function Installments() {
           {Array.from({ length: 4 }, (_, i) => (
             <Skeleton key={i} className="h-[180px] w-full rounded-card" />
           ))}
+          <span className="sr-only">Carregando...</span>
         </div>
       ) : groups.length === 0 ? (
         <div className="card">
@@ -469,7 +470,7 @@ export default function Installments() {
             />
           </div>
           {form.totalAmount && form.installmentCount && (
-            <p className="rounded-xl bg-[#E9F0EC] p-2.5 text-xs text-forest">
+            <p className="rounded-xl bg-forest-soft p-2.5 text-xs text-forest">
               {parseInt(form.installmentCount)}x de{' '}
               {formatCurrency(installmentPreviewCents(form.totalAmount, form.installmentCount))}
             </p>
@@ -495,7 +496,7 @@ export default function Installments() {
             </Select>
           </div>
           {selectedAccount?.type === 'CREDIT_CARD' && (
-            <p className="rounded-xl bg-[#E9F0EC] p-2.5 text-xs text-forest">
+            <p className="rounded-xl bg-forest-soft p-2.5 text-xs text-forest">
               {selectedAccount.closingDay && selectedAccount.dueDay
                 ? `Fechamento dia ${selectedAccount.closingDay} · vencimento dia ${selectedAccount.dueDay}. A primeira parcela será calculada automaticamente.`
                 : 'Complete fechamento e vencimento do cartão para calcular a primeira parcela automaticamente.'}

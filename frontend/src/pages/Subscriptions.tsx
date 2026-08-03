@@ -224,6 +224,7 @@ export default function Subscriptions() {
           {Array.from({ length: 5 }, (_, i) => (
             <Skeleton key={i} className="h-[64px] w-full" />
           ))}
+          <span className="sr-only">Carregando...</span>
         </div>
       ) : subscriptions.length === 0 ? (
         <div className="card">
@@ -242,7 +243,7 @@ export default function Subscriptions() {
             return (
               <div
                 key={subscription.id}
-                className="group flex items-center gap-3.5 border-b border-border-faint px-5 py-4 transition-colors last:border-b-0 hover:bg-[#FAF9F4]"
+                className="group flex items-center gap-3.5 border-b border-border-faint px-5 py-4 transition-colors last:border-b-0 hover:bg-paper"
               >
                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[12px] bg-forest-soft font-display text-[13px] font-bold text-forest">
                   {initials(subscription.name)}
@@ -399,7 +400,7 @@ export default function Subscriptions() {
             </Select>
           </div>
           {selectedAccount?.type === 'CREDIT_CARD' && (
-            <p className="rounded-xl bg-[#E9F0EC] p-2.5 text-xs text-forest">
+            <p className="rounded-xl bg-forest-soft p-2.5 text-xs text-forest">
               {selectedAccount.closingDay && selectedAccount.dueDay
                 ? `Fechamento dia ${selectedAccount.closingDay} · vencimento dia ${selectedAccount.dueDay}. A cobrança mensal respeitará a fatura do cartão.`
                 : 'Complete fechamento e vencimento do cartão para calcular a cobrança automaticamente.'}

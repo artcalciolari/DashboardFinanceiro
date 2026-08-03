@@ -36,16 +36,16 @@ export default function Sidebar() {
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-[260px] min-h-screen fixed top-0 left-0 z-40 bg-gradient-to-b from-forest to-forest-deep">
         <div className="flex items-center gap-3 px-6 pt-6 pb-6">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-lime shadow-[0_4px_12px_rgba(200,241,105,0.25)]">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-lime shadow-[0_4px_12px_rgba(125,232,250,0.25)]">
             <TrendingUp size={19} className="text-forest" strokeWidth={2.5} />
           </div>
           <div className="leading-tight">
             <div className="font-display text-[16.5px] font-bold tracking-tight text-white">Saldo Claro</div>
-            <div className="text-[11px] font-medium text-[#6E9584]">Finanças pessoais</div>
+            <div className="text-[11px] font-medium text-[#A8C6D8]">Finanças pessoais</div>
           </div>
         </div>
 
-        <div className="px-6 pb-2 text-eyebrow uppercase text-[#5E7F70]">Menu</div>
+        <div className="px-6 pb-2 text-eyebrow uppercase text-[#8FB3C6]">Menu</div>
 
         <nav className="flex flex-1 flex-col gap-0.5 px-3">
           {navItems.map(({ to, label, icon: Icon, end }) => (
@@ -58,7 +58,7 @@ export default function Sidebar() {
                   'group relative flex items-center gap-3 rounded-control px-3 py-2.5 text-[13.5px] transition-colors duration-150',
                   isActive
                     ? 'bg-white/10 font-semibold text-white'
-                    : 'font-medium text-[#9DBBAD] hover:bg-white/5 hover:text-white'
+                    : 'font-medium text-[#A3C0D2] hover:bg-white/5 hover:text-white'
                 )
               }
             >

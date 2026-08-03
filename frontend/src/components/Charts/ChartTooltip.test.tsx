@@ -34,6 +34,38 @@ describe('ChartTooltip', () => {
     expect(screen.getByText('Despesas')).toBeInTheDocument();
   });
 
+  it('excludes auxiliary series by dataKey name', () => {
+    render(
+      <ChartTooltip
+        active
+        exclude={['cumulative']}
+        payload={[
+          { name: 'Acumulado', value: 80000 },
+          { name: 'cumulative', value: 80000, color: 'url(#cumGradient)' },
+        ]}
+      />
+    );
+    expect(screen.getByText('Acumulado')).toBeInTheDocument();
+    expect(screen.queryByText('cumulative')).not.toBeInTheDocument();
+  });
+
+  it('skips entries without a name', () => {
+    render(
+      <ChartTooltip
+        active
+        payload={[{ value: 5000 }, { name: 'Receitas', value: 10000 }]}
+      />
+    );
+    expect(screen.getByText('Receitas')).toBeInTheDocument();
+  });
+
+  it('returns null when every entry is excluded', () => {
+    const { container } = render(
+      <ChartTooltip active exclude={['cumulative']} payload={[{ name: 'cumulative', value: 1 }]} />
+    );
+    expect(container.firstChild).toBeNull();
+  });
+
   it('falls back when value and color missing', () => {
     render(
       <ChartTooltip

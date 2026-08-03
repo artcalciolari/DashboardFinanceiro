@@ -155,6 +155,7 @@ export default function Alerts() {
           {Array.from({ length: 4 }, (_, i) => (
             <Skeleton key={i} className="h-[88px] w-full rounded-2xl" />
           ))}
+          <span className="sr-only">Carregando...</span>
         </div>
       ) : alerts.length === 0 ? (
         <div className="card max-w-[720px]">

@@ -147,6 +147,7 @@ export default function Categories() {
           {Array.from({ length: 5 }, (_, i) => (
             <Skeleton key={i} className="h-[64px] w-full" />
           ))}
+          <span className="sr-only">Carregando...</span>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

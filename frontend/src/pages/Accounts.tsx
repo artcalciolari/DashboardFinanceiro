@@ -153,6 +153,7 @@ export default function Accounts() {
           {Array.from({ length: 5 }, (_, i) => (
             <Skeleton key={i} className="h-[64px] w-full" />
           ))}
+          <span className="sr-only">Carregando...</span>
         </div>
       ) : accounts.length === 0 ? (
         <div className="card">
@@ -227,8 +228,7 @@ export default function Accounts() {
                         {account.type === 'INVESTMENT' ? 'Total investido' : 'Saldo inicial'}
                       </p>
                       <p
-                        className="tabular mt-0.5 font-display text-[26px] font-bold tracking-tight"
-                        style={{ color: '#0F7A52' }}
+                        className="tabular mt-0.5 font-display text-[26px] font-bold tracking-tight text-income"
                       >
                         {formatCurrency(account.openingBalanceCents)}
                       </p>

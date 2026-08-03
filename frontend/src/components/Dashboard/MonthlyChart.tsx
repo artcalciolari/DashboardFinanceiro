@@ -17,7 +17,7 @@ import Skeleton from '../ui/Skeleton';
 const LEGEND = [
   { name: 'Receitas', color: '#3E9E72' },
   { name: 'Despesas', color: '#E5A08B' },
-  { name: 'Acumulado', color: '#0B3529' },
+  { name: 'Acumulado', color: '#0B3A5C' },
 ];
 
 export default function MonthlyChart() {
@@ -62,21 +62,21 @@ export default function MonthlyChart() {
           <ComposedChart data={chartData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="cumGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0B3529" stopOpacity={0.10} />
-                <stop offset="100%" stopColor="#0B3529" stopOpacity={0} />
+                <stop offset="0%" stopColor="#0B3A5C" stopOpacity={0.10} />
+                <stop offset="100%" stopColor="#0B3A5C" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="#ECEAE3" strokeDasharray="2 6" vertical={false} />
+            <CartesianGrid stroke="#E6EBEE" strokeDasharray="2 6" vertical={false} />
             <XAxis
               dataKey="label"
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 11.5, fill: '#8B968F' }}
+              tick={{ fontSize: 11.5, fill: '#8695A0' }}
               dy={6}
             />
             <YAxis yAxisId="bars" hide />
             <YAxis yAxisId="line" orientation="right" hide />
-            <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(11,53,41,0.04)' }} />
+            <Tooltip content={<ChartTooltip exclude={['cumulative']} />} cursor={{ fill: 'rgba(11,58,92,0.05)' }} />
             <Bar yAxisId="bars" dataKey="incomeCents" name="Receitas" fill="#3E9E72" radius={[6, 6, 0, 0]} barSize={20} />
             <Bar yAxisId="bars" dataKey="expensesCents" name="Despesas" fill="#E5A08B" radius={[6, 6, 0, 0]} barSize={20} />
             <Area
@@ -91,9 +91,9 @@ export default function MonthlyChart() {
               type="monotone"
               dataKey="cumulative"
               name="Acumulado"
-              stroke="#0B3529"
+              stroke="#0B3A5C"
               strokeWidth={2.5}
-              dot={{ r: 3.5, fill: '#fff', stroke: '#0B3529', strokeWidth: 2.5 }}
+              dot={{ r: 3.5, fill: '#fff', stroke: '#0B3A5C', strokeWidth: 2.5 }}
               activeDot={{ r: 5 }}
             />
           </ComposedChart>

@@ -70,14 +70,14 @@ export default function SummaryCards() {
       <div className="relative flex flex-col justify-between overflow-hidden rounded-card bg-gradient-to-br from-forest to-forest-deep p-7 text-white shadow-card-hover">
         <div
           className="pointer-events-none absolute -right-10 -top-10 h-[180px] w-[180px] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(200,241,105,0.14), transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, rgba(125,232,250,0.14), transparent 70%)' }}
         />
         <div
           className="pointer-events-none absolute -bottom-8 -left-8 h-[140px] w-[140px] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(200,241,105,0.06), transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, rgba(125,232,250,0.06), transparent 70%)' }}
         />
         <div className="relative flex items-center justify-between">
-          <span className="eyebrow text-[#9DBBAD]">Saldo do mês</span>
+          <span className="eyebrow text-[#A3C0D2]">Saldo do mês</span>
           {pctChange !== undefined && (
             <span
               className={clsx(
@@ -95,7 +95,7 @@ export default function SummaryCards() {
             {isLoading ? '—' : formatCurrency(currentBalance)}
           </div>
           {balanceDiff !== undefined && previousLabel && (
-            <div className="text-[13px] text-[#9DBBAD]">
+            <div className="text-[13px] text-[#A3C0D2]">
               {balanceDiff >= 0 ? '+ ' : '- '}
               {formatCurrency(Math.abs(balanceDiff))} em relação a {previousLabel}
             </div>
@@ -105,14 +105,14 @@ export default function SummaryCards() {
           <svg viewBox="0 0 260 48" preserveAspectRatio="none" className="relative mt-3.5 h-11 w-full">
             <defs>
               <linearGradient id="sparkGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="rgba(200,241,105,0.25)" />
-                <stop offset="100%" stopColor="rgba(200,241,105,0)" />
+                <stop offset="0%" stopColor="rgba(125,232,250,0.25)" />
+                <stop offset="100%" stopColor="rgba(125,232,250,0)" />
               </linearGradient>
             </defs>
             <polygon points={areaPts} fill="url(#sparkGradient)" />
-            <polyline points={sparkPts} fill="none" stroke="#C8F169" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points={sparkPts} fill="none" stroke="#7DE8FA" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
             {lastPt && (
-              <circle cx={lastPt.x} cy={lastPt.y} r={3.5} fill="#C8F169" stroke="#0B3529" strokeWidth={1.5} />
+              <circle cx={lastPt.x} cy={lastPt.y} r={3.5} fill="#7DE8FA" stroke="#0B3A5C" strokeWidth={1.5} />
             )}
           </svg>
         )}
