@@ -50,31 +50,39 @@ export default function SummaryCards() {
   const sparkMin = sparkPoints.length ? Math.min(0, ...sparkPoints) : 0;
   const sparkMax = sparkPoints.length ? Math.max(0, ...sparkPoints) : 1;
   const sparkRange = sparkChartRange(sparkMin, sparkMax);
-  const sparkPts = sparkPoints
-    .map((v, i) => {
-      const x = sparkChartX(i, sparkPoints.length);
-      const y = 44 - ((v - sparkMin) / sparkRange) * 40;
-      return `${Math.round(x)},${Math.round(y)}`;
-    })
-    .join(' ');
+  const sparkCoords = sparkPoints.map((v, i) => {
+    const x = sparkChartX(i, sparkPoints.length);
+    const y = 44 - ((v - sparkMin) / sparkRange) * 40;
+    return { x: Math.round(x), y: Math.round(y) };
+  });
+  const sparkPts = sparkCoords.map((p) => `${p.x},${p.y}`).join(' ');
+  const areaPts =
+    sparkCoords.length > 1
+      ? `0,48 ${sparkPts} 260,48`
+      : '';
+  const lastPt = sparkCoords[sparkCoords.length - 1];
 
   const incomeCount = incomePage?.totalCount ?? 0;
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.4fr_1fr_1fr]">
       {/* Hero: Saldo do mês */}
-      <div className="relative flex flex-col justify-between overflow-hidden rounded-card bg-forest p-6 text-white">
+      <div className="relative flex flex-col justify-between overflow-hidden rounded-card bg-gradient-to-br from-forest to-forest-deep p-7 text-white shadow-card-hover">
         <div
           className="pointer-events-none absolute -right-10 -top-10 h-[180px] w-[180px] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(200,241,105,0.18), transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, rgba(200,241,105,0.14), transparent 70%)' }}
+        />
+        <div
+          className="pointer-events-none absolute -bottom-8 -left-8 h-[140px] w-[140px] rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(200,241,105,0.06), transparent 70%)' }}
         />
         <div className="relative flex items-center justify-between">
-          <span className="text-[13px] font-medium text-[#9DBFB0]">Saldo do mês</span>
+          <span className="eyebrow text-[#9DBBAD]">Saldo do mês</span>
           {pctChange !== undefined && (
             <span
               className={clsx(
                 'inline-flex items-center gap-1 rounded-pill px-2.5 py-1 text-xs font-semibold',
-                pctChange >= 0 ? 'bg-lime/[0.16] text-lime' : 'bg-white/10 text-white'
+                pctChange >= 0 ? 'bg-lime/15 text-lime' : 'bg-white/10 text-white'
               )}
             >
               {pctChange >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
@@ -83,11 +91,11 @@ export default function SummaryCards() {
           )}
         </div>
         <div className="relative">
-          <div className="tabular my-3.5 font-display text-[42px] font-bold leading-none tracking-tight">
+          <div className="tabular my-3.5 font-display text-display-xl leading-none tracking-tight">
             {isLoading ? '—' : formatCurrency(currentBalance)}
           </div>
           {balanceDiff !== undefined && previousLabel && (
-            <div className="text-[13px] text-[#9DBFB0]">
+            <div className="text-[13px] text-[#9DBBAD]">
               {balanceDiff >= 0 ? '+ ' : '- '}
               {formatCurrency(Math.abs(balanceDiff))} em relação a {previousLabel}
             </div>
@@ -95,42 +103,52 @@ export default function SummaryCards() {
         </div>
         {sparkPoints.length > 1 && (
           <svg viewBox="0 0 260 48" preserveAspectRatio="none" className="relative mt-3.5 h-11 w-full">
+            <defs>
+              <linearGradient id="sparkGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="rgba(200,241,105,0.25)" />
+                <stop offset="100%" stopColor="rgba(200,241,105,0)" />
+              </linearGradient>
+            </defs>
+            <polygon points={areaPts} fill="url(#sparkGradient)" />
             <polyline points={sparkPts} fill="none" stroke="#C8F169" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            {lastPt && (
+              <circle cx={lastPt.x} cy={lastPt.y} r={3.5} fill="#C8F169" stroke="#0B3529" strokeWidth={1.5} />
+            )}
           </svg>
         )}
       </div>
 
       {/* KPI: Receitas */}
-      <div className="flex flex-col justify-between rounded-card border border-border bg-card p-[22px]">
+      <div className="card flex flex-col justify-between">
         <div className="flex items-center justify-between">
-          <span className="text-[13px] font-medium text-muted">Receitas</span>
-          <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[10px] bg-[#E7F5EC]">
+          <span className="eyebrow">Receitas</span>
+          <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#E7F5EC]">
             <TrendingUp size={17} className="text-income" strokeWidth={2.2} />
           </div>
         </div>
         <div>
-          <div className="tabular mt-4 whitespace-nowrap font-display text-[27px] font-bold tracking-tight text-income">
+          <div className="tabular mt-4 whitespace-nowrap font-display text-display-md tracking-tight text-income">
             {formatSummaryAmount(isLoading, data?.totalIncomeCents)}
           </div>
-          <div className="mt-0.5 text-[12.5px] text-faint">
+          <div className="mt-0.5 text-[12px] text-faint">
             {incomeCount} entrada{incomeCount === 1 ? '' : 's'} no mês
           </div>
         </div>
       </div>
 
       {/* KPI: Despesas pessoais */}
-      <div className="flex flex-col justify-between rounded-card border border-border bg-card p-[22px]">
+      <div className="card flex flex-col justify-between">
         <div className="flex items-center justify-between">
-          <span className="text-[13px] font-medium text-muted">Despesas pessoais</span>
-          <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[10px] bg-[#FBEBE6]">
+          <span className="eyebrow">Despesas pessoais</span>
+          <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#FBEBE6]">
             <TrendingDown size={17} className="text-expense" strokeWidth={2.2} />
           </div>
         </div>
         <div>
-          <div className="tabular mt-4 whitespace-nowrap font-display text-[27px] font-bold tracking-tight text-expense">
+          <div className="tabular mt-4 whitespace-nowrap font-display text-display-md tracking-tight text-expense">
             {formatSummaryAmount(isLoading, data?.totalExpensesCents)}
           </div>
-          <div className="mt-0.5 text-[12.5px] text-faint">
+          <div className="mt-0.5 text-[12px] text-faint">
             Fatura total: {formatCurrency(data?.invoiceExpensesCents ?? 0)}
           </div>
         </div>

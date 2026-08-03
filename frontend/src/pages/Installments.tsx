@@ -13,6 +13,8 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import FormError from '../components/ui/FormError';
+import Skeleton from '../components/ui/Skeleton';
+import EmptyState from '../components/ui/EmptyState';
 import { clsx } from 'clsx';
 import type { InstallmentGroup, Transaction } from '../types';
 import { useDate } from '../context/DateContext';
@@ -253,7 +255,10 @@ export default function Installments() {
     const { group, paid, total, pct, installmentAmount, remainingAmount, next, last, isFinished, isCancelled } = view;
 
     return (
-      <div key={group.id} className="card">
+      <div
+        key={group.id}
+        className="card transition-all duration-150 hover:-translate-y-px hover:shadow-card-hover"
+      >
         <div className="flex items-start justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -324,8 +329,8 @@ export default function Installments() {
         <div className="mb-2 h-2 overflow-hidden rounded-pill bg-chip">
           <div
             className={clsx(
-              'h-full rounded-pill transition-all',
-              isCancelled ? 'bg-faint' : isFinished ? 'bg-income' : 'bg-forest'
+              'h-full rounded-pill transition-[width] duration-500 ease-out-expo',
+              isCancelled ? 'bg-faint' : isFinished ? 'bg-income' : pct >= 75 ? 'bg-income' : 'bg-forest'
             )}
             style={{ width: `${pct}%` }}
           />
@@ -345,8 +350,8 @@ export default function Installments() {
     <div>
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="font-display text-[24px] font-bold tracking-tight text-ink">Parcelamentos</h1>
-          <p className="mt-1 text-sm capitalize text-muted">
+          <h1 className="font-display text-display-lg tracking-tight text-ink">Parcelamentos</h1>
+          <p className="mt-1 text-[13.5px] capitalize text-muted">
             {ongoingInstallments.length} ativo(s) · {formatCurrency(committedMonthly)} por mês comprometidos
           </p>
         </div>
@@ -357,14 +362,19 @@ export default function Installments() {
       </div>
 
       {isLoading ? (
-        <div className="card py-8 text-center text-faint">Carregando...</div>
+        <div className="space-y-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className="h-[180px] w-full rounded-card" />
+          ))}
+        </div>
       ) : groups.length === 0 ? (
-        <div className="card py-8 text-center">
-          <Calendar size={32} className="mx-auto mb-2 text-faint" />
-          <p className="mb-3 text-sm text-faint">Nenhum parcelamento cadastrado</p>
-          <Button variant="secondary" size="sm" onClick={() => setIsModalOpen(true)}>
-            Registrar parcelamento
-          </Button>
+        <div className="card">
+          <EmptyState
+            icon={Calendar}
+            title="Nenhum parcelamento cadastrado"
+            actionLabel="Registrar parcelamento"
+            onAction={() => setIsModalOpen(true)}
+          />
         </div>
       ) : (
         <div className="space-y-6">

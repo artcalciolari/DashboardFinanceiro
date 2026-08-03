@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+﻿import { NavLink } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard,
@@ -9,7 +9,6 @@ import {
   RefreshCw,
   Bell,
   TrendingUp,
-  Settings,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { alertsApi } from '../../services/api';
@@ -35,18 +34,20 @@ export default function Sidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex flex-col w-[250px] bg-forest min-h-screen fixed top-0 left-0 z-40">
-        <div className="flex items-center gap-3 px-[22px] pt-[22px] pb-5">
-          <div className="flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[11px] bg-lime">
-            <TrendingUp size={20} className="text-forest" strokeWidth={2.4} />
+      <aside className="hidden md:flex flex-col w-[260px] min-h-screen fixed top-0 left-0 z-40 bg-gradient-to-b from-forest to-forest-deep">
+        <div className="flex items-center gap-3 px-6 pt-6 pb-6">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-lime shadow-[0_4px_12px_rgba(200,241,105,0.25)]">
+            <TrendingUp size={19} className="text-forest" strokeWidth={2.5} />
           </div>
           <div className="leading-tight">
-            <div className="font-display text-[17px] font-bold tracking-tight text-white">Saldo Claro</div>
-            <div className="text-[11.5px] font-medium text-[#7FA593]">Finanças pessoais</div>
+            <div className="font-display text-[16.5px] font-bold tracking-tight text-white">Saldo Claro</div>
+            <div className="text-[11px] font-medium text-[#6E9584]">Finanças pessoais</div>
           </div>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-[3px] px-3 py-1.5">
+        <div className="px-6 pb-2 text-eyebrow uppercase text-[#5E7F70]">Menu</div>
+
+        <nav className="flex flex-1 flex-col gap-0.5 px-3">
           {navItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
@@ -54,38 +55,34 @@ export default function Sidebar() {
               end={end}
               className={({ isActive }) =>
                 clsx(
-                  'flex items-center gap-3 rounded-[11px] px-3 py-2.5 text-[13.5px] transition-colors',
+                  'group relative flex items-center gap-3 rounded-control px-3 py-2.5 text-[13.5px] transition-colors duration-150',
                   isActive
-                    ? 'bg-lime/[0.14] font-semibold text-white'
-                    : 'font-medium text-[#8FB3A2] hover:bg-white/5 hover:text-white'
+                    ? 'bg-white/10 font-semibold text-white'
+                    : 'font-medium text-[#9DBBAD] hover:bg-white/5 hover:text-white'
                 )
               }
             >
-              <Icon size={19} />
-              <span className="flex-1">{label}</span>
-              {to === '/alerts' && attentionCount > 0 && (
-                <span className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-pill bg-lime px-1.5 text-[11px] font-bold text-forest">
-                  {attentionCount}
-                </span>
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-lime" />
+                  )}
+                  <Icon size={18} strokeWidth={2.1} className={isActive ? 'text-lime' : ''} />
+                  <span className="flex-1">{label}</span>
+                  {to === '/alerts' && attentionCount > 0 && (
+                    <span className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-pill bg-lime px-1.5 text-[11px] font-bold text-forest">
+                      {attentionCount}
+                    </span>
+                  )}
+                </>
               )}
             </NavLink>
           ))}
         </nav>
-
-        <div className="m-3 flex items-center gap-[11px] rounded-2xl bg-white/5 px-4 py-3.5">
-          <div className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full bg-[#1E5C46] font-display text-sm font-bold text-lime">
-            SC
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-semibold text-white">Saldo Claro</div>
-            <div className="text-[11.5px] text-[#7FA593]">Uso pessoal</div>
-          </div>
-          <Settings size={16} className="text-[#7FA593]" />
-        </div>
       </aside>
 
       {/* Mobile bottom navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex overflow-x-auto border-t border-border bg-card pb-[env(safe-area-inset-bottom)]">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex overflow-x-auto border-t border-border bg-white/90 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
         {navItems.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
@@ -93,13 +90,24 @@ export default function Sidebar() {
             end={end}
             className={({ isActive }) =>
               clsx(
-                'min-w-[64px] flex-1 flex flex-col items-center justify-center py-2.5 text-[11px] transition-colors',
-                isActive ? 'text-forest' : 'text-faint'
+                'min-w-[64px] flex-1 flex flex-col items-center justify-center py-2.5 text-[10.5px] transition-colors',
+                isActive ? 'font-semibold text-forest' : 'font-medium text-faint'
               )
             }
           >
-            <Icon size={18} />
-            <span className="mt-1 w-full truncate px-0.5 text-center leading-tight">{label}</span>
+            {({ isActive }) => (
+              <>
+                <span
+                  className={clsx(
+                    'flex h-8 w-14 items-center justify-center rounded-pill',
+                    isActive ? 'bg-forest-soft' : ''
+                  )}
+                >
+                  <Icon size={18} />
+                </span>
+                <span className="mt-1 w-full truncate px-0.5 text-center leading-tight">{label}</span>
+              </>
+            )}
           </NavLink>
         ))}
       </nav>

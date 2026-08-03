@@ -19,6 +19,8 @@ describe('Button', () => {
     expect(screen.getByRole('button')).toHaveClass('bg-expense/10');
     rerender(<Button variant="ghost">A</Button>);
     expect(screen.getByRole('button')).toHaveClass('hover:bg-chip');
+    rerender(<Button variant="accent">A</Button>);
+    expect(screen.getByRole('button')).toHaveClass('bg-lime');
   });
 
   it('shows loading spinner and disables', () => {

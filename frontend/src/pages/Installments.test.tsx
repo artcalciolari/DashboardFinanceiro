@@ -68,6 +68,15 @@ const finishedNoLast = {
   nextTransaction: null,
 };
 
+const nearlyDone = {
+  ...mockInstallmentGroup,
+  id: 'near',
+  description: 'Quase final',
+  paidCount: 8,
+  remainingAmountCents: 60000,
+  isCancelled: false,
+};
+
 const thirdParty = {
   ...mockInstallmentGroup,
   id: 'tp',
@@ -127,13 +136,15 @@ describe('Installments', () => {
     const user = userEvent.setup();
     getPage.mockResolvedValue(
       makeInstallmentsPage(
-        [mockInstallmentGroup, finished, cancelled, cancelledNoDate, finishedNoLast, thirdParty],
+        [mockInstallmentGroup, nearlyDone, finished, cancelled, cancelledNoDate, finishedNoLast, thirdParty],
         { page: 1, pageSize: 25, total: 30, totalPages: 2 }
       )
     );
 
     renderWithProviders(<Installments />);
     await waitFor(() => expect(screen.getByText('Em andamento')).toBeInTheDocument());
+    expect(screen.getByText('Quase final')).toBeInTheDocument();
+    expect(document.querySelector('.bg-income')).toBeTruthy();
     expect(screen.getByText('Finalizados')).toBeInTheDocument();
     expect(screen.getByText('Cancelados')).toBeInTheDocument();
     expect(screen.getByText(/Terceiro: Ana/)).toBeInTheDocument();

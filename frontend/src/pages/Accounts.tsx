@@ -11,6 +11,8 @@ import Select from '../components/ui/Select';
 import ColorPicker from '../components/ui/ColorPicker';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import FormError from '../components/ui/FormError';
+import Skeleton from '../components/ui/Skeleton';
+import EmptyState from '../components/ui/EmptyState';
 
 const ACCOUNT_ICONS: Record<AccountType, typeof CreditCard> = {
   CREDIT_CARD: CreditCard,
@@ -134,31 +136,42 @@ export default function Accounts() {
     <div>
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="font-display text-[24px] font-bold tracking-tight text-ink">Contas & cartões</h1>
-          <p className="mt-1 text-sm text-muted">
+          <h1 className="font-display text-display-lg tracking-tight text-ink">Contas & cartões</h1>
+          <p className="mt-1 text-[13.5px] text-muted">
             {accounts.length} conta(s) · {creditCards.length} cartão(ões) · Saldo base{' '}
             <b className="text-ink">{formatCurrency(cashBalance)}</b>
           </p>
         </div>
-        <Button onClick={openCreate} size="sm">
+        <Button onClick={openCreate} variant="primary" size="sm">
           <Plus size={16} />
           Nova conta
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="card py-8 text-center text-faint">Carregando...</div>
+        <div className="space-y-3">
+          {Array.from({ length: 5 }, (_, i) => (
+            <Skeleton key={i} className="h-[64px] w-full" />
+          ))}
+        </div>
       ) : accounts.length === 0 ? (
-        <div className="card py-8 text-center">
-          <p className="mb-3 text-sm text-faint">Nenhuma conta cadastrada</p>
-          <Button variant="secondary" size="sm" onClick={openCreate}>Adicionar conta</Button>
+        <div className="card">
+          <EmptyState
+            icon={Wallet}
+            title="Nenhuma conta cadastrada"
+            actionLabel="Adicionar conta"
+            onAction={openCreate}
+          />
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {accounts.map((account) => {
             const Icon = ACCOUNT_ICONS[account.type];
             return (
-              <div key={account.id} className="card">
+              <div
+                key={account.id}
+                className="card transition-all duration-150 hover:-translate-y-px hover:shadow-card-hover"
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div
@@ -168,7 +181,11 @@ export default function Accounts() {
                       <Icon size={20} style={{ color: account.color }} />
                     </div>
                     <div>
-                      <p className="text-[15px] font-semibold text-ink">{account.name}</p>
+                      <div
+                        className="h-1 w-10 rounded-pill"
+                        style={{ backgroundColor: account.color }}
+                      />
+                      <p className="mt-2 text-[15px] font-semibold text-ink">{account.name}</p>
                       <p className="text-[12.5px] text-faint">{ACCOUNT_TYPE_LABELS[account.type]}</p>
                     </div>
                   </div>

@@ -69,6 +69,7 @@ vi.mock('recharts', () => {
     ComposedChart: PassThrough,
     Bar: () => null,
     Line: () => null,
+    Area: () => null,
     XAxis: () => null,
     YAxis: () => null,
     CartesianGrid: () => null,
