@@ -1,4 +1,4 @@
-import SummaryCards from '../components/Dashboard/SummaryCards';
+﻿import SummaryCards from '../components/Dashboard/SummaryCards';
 import MonthlyChart from '../components/Dashboard/MonthlyChart';
 import CategoryChart from '../components/Dashboard/CategoryChart';
 import AlertsWidget from '../components/Dashboard/AlertsWidget';
@@ -11,24 +11,22 @@ export default function Dashboard() {
   const { month, year } = useDate();
 
   return (
-    <div>
-      <div className="mb-[22px]">
-        <h1 className="font-display text-[26px] font-bold tracking-tight text-ink">Olá! 👋</h1>
-        <p className="mt-1 text-[14.5px] text-muted">
+    <div className="space-y-5">
+      <div className="mb-6">
+        <h1 className="font-display text-display-lg tracking-tight text-ink">Olá! 👋</h1>
+        <p className="mt-1 text-[13.5px] text-muted">
           Aqui está o resumo de <span className="capitalize">{formatMonthYear(month, year)}</span>.
         </p>
       </div>
 
-      <div className="mb-4">
-        <SummaryCards />
-      </div>
+      <SummaryCards />
 
-      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-[1.55fr_1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.55fr_1fr]">
         <MonthlyChart />
         <CategoryChart />
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <AccountSummaryWidget />
         <ActiveInstallmentsWidget />
       </div>

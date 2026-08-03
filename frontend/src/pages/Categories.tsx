@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Tag } from 'lucide-react';
 import { categoriesApi } from '../services/api';
 import type { Category, CategoryType } from '../types';
 import Modal from '../components/ui/Modal';
@@ -10,6 +10,8 @@ import Select from '../components/ui/Select';
 import ColorPicker from '../components/ui/ColorPicker';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import FormError from '../components/ui/FormError';
+import Skeleton from '../components/ui/Skeleton';
+import EmptyState from '../components/ui/EmptyState';
 
 interface FormState {
   name: string;
@@ -93,15 +95,16 @@ export default function Categories() {
 
   function CategoryRow(c: Category) {
     return (
-      <div key={c.id} className="group flex items-center gap-3.5 rounded-2xl px-4 py-3 transition-colors hover:bg-[#FAF9F4]">
+      <div
+        key={c.id}
+        className="group flex items-center gap-3.5 rounded-lg px-4 py-3 transition-colors hover:bg-paper"
+      >
         <span
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px]"
+          className="h-3 w-3 flex-shrink-0 rounded-[4px]"
           style={{ backgroundColor: c.color }}
-        >
-          <span className="h-3 w-3 rounded-[4px] bg-white/60" />
-        </span>
+        />
         <div className="flex-1">
-          <div className="text-sm font-semibold text-ink">{c.name}</div>
+          <div className="text-[13.5px] font-semibold text-ink">{c.name}</div>
           <div className="text-xs text-faint">{c.type === 'INCOME' ? 'Receita' : 'Despesa'}</div>
         </div>
         <div className="flex gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
@@ -130,8 +133,8 @@ export default function Categories() {
     <div>
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="font-display text-[24px] font-bold tracking-tight text-ink">Categorias</h1>
-          <p className="mt-1 text-sm text-muted">Organize suas receitas e despesas</p>
+          <h1 className="font-display text-display-lg tracking-tight text-ink">Categorias</h1>
+          <p className="mt-1 text-[13.5px] text-muted">Organize suas receitas e despesas</p>
         </div>
         <Button onClick={openCreate} size="sm">
           <Plus size={16} />
@@ -140,13 +143,17 @@ export default function Categories() {
       </div>
 
       {isLoading ? (
-        <div className="card py-8 text-center text-faint">Carregando...</div>
+        <div className="space-y-3">
+          {Array.from({ length: 5 }, (_, i) => (
+            <Skeleton key={i} className="h-[64px] w-full" />
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="card p-2">
             <h3 className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-faint">Despesas</h3>
             {expenses.length === 0 ? (
-              <p className="px-3 pb-2 text-sm text-faint">Nenhuma categoria</p>
+              <EmptyState icon={Tag} title="Nenhuma categoria" />
             ) : (
               <div>{expenses.map(CategoryRow)}</div>
             )}
@@ -154,7 +161,7 @@ export default function Categories() {
           <div className="card p-2">
             <h3 className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wide text-faint">Receitas</h3>
             {incomes.length === 0 ? (
-              <p className="px-3 pb-2 text-sm text-faint">Nenhuma categoria</p>
+              <EmptyState icon={Tag} title="Nenhuma categoria" />
             ) : (
               <div>{incomes.map(CategoryRow)}</div>
             )}

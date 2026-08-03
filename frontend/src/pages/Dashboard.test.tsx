@@ -43,6 +43,7 @@ vi.mock('recharts', () => {
     ComposedChart: Stub,
     Bar: () => null,
     Line: () => null,
+    Area: () => null,
     XAxis: () => null,
     YAxis: () => null,
     CartesianGrid: () => null,

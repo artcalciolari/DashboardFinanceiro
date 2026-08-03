@@ -80,7 +80,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
   return createPortal(
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[rgba(12,36,29,0.45)] backdrop-blur-[2px]"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-forest-deep/50 backdrop-blur-sm animate-sc-fade"
       role="presentation"
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
     >
@@ -91,22 +91,22 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
         aria-labelledby={titleId}
         tabIndex={-1}
         className={clsx(
-          'w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[22px] bg-card shadow-modal animate-[sc-rise_.28s_ease_both]',
+          'w-full max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[18px] bg-card shadow-modal animate-sc-scale-in',
           sizeClass
         )}
       >
-        <div className="flex items-center justify-between p-5 pb-4">
-          <h2 id={titleId} className="font-display text-xl font-bold text-ink">{title}</h2>
+        <div className="flex items-center justify-between border-b border-border-faint p-5 pb-4">
+          <h2 id={titleId} className="font-display text-display-md text-ink">{title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-chip text-muted transition-colors hover:bg-border"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted transition-colors hover:bg-chip hover:text-ink"
             aria-label="Fechar modal"
           >
             <X size={17} />
           </button>
         </div>
-        <div className="px-5 pb-5">{children}</div>
+        <div className="px-5 pb-5 pt-4">{children}</div>
       </div>
     </div>,
     document.body

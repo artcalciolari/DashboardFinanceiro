@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Download, Search, Plus } from 'lucide-react';
+﻿import { ChevronLeft, ChevronRight, Download, Search, Plus } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useDate } from '../../context/DateContext';
 import { useSearch } from '../../context/SearchContext';
@@ -47,23 +47,23 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-border bg-[rgba(244,242,236,0.85)] px-4 py-3 backdrop-blur-md sm:gap-3 md:flex-nowrap md:px-8 md:py-3.5">
-      {showsPeriod && <div className="flex items-center gap-1.5 rounded-control border border-border bg-white p-1">
+    <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-border bg-paper/80 px-4 py-3 backdrop-blur-md sm:gap-3 md:flex-nowrap md:px-8">
+      {showsPeriod && <div className="flex items-center gap-0.5 rounded-control border border-border bg-white p-1 shadow-card">
         <button
           type="button"
           onClick={prevMonth}
-          className="flex h-[30px] w-[30px] items-center justify-center rounded-lg text-muted transition-colors hover:bg-chip"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-chip hover:text-ink"
           aria-label="Mês anterior"
         >
           <ChevronLeft size={16} />
         </button>
-        <span className="min-w-[132px] text-center text-[13.5px] font-semibold capitalize text-ink">
+        <span className="min-w-[120px] text-center text-[13px] font-semibold capitalize text-ink tabular">
           {formatMonthYear(month, year)}
         </span>
         <button
           type="button"
           onClick={nextMonth}
-          className="flex h-[30px] w-[30px] items-center justify-center rounded-lg text-muted transition-colors hover:bg-chip"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-muted transition-colors hover:bg-chip hover:text-ink"
           aria-label="Próximo mês"
         >
           <ChevronRight size={16} />
@@ -74,8 +74,9 @@ export default function Header() {
         <button
           type="button"
           onClick={goToCurrentMonth}
-          className="hidden h-[38px] flex-shrink-0 items-center rounded-control border border-border bg-white px-3.5 text-[13px] font-semibold text-forest transition-colors hover:bg-chip sm:inline-flex"
+          className="hidden h-9 flex-shrink-0 items-center gap-1.5 rounded-control border border-border bg-white px-3 text-[13px] font-semibold text-forest transition-colors hover:bg-chip sm:inline-flex"
         >
+          <span className="h-1.5 w-1.5 rounded-full bg-lime-strong" />
           Hoje
         </button>
       )}
@@ -90,15 +91,16 @@ export default function Header() {
           aria-label="Buscar transações"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="h-10 w-full rounded-control border border-border bg-white pl-9 pr-3 text-[13.5px] text-ink outline-none transition-shadow focus:border-forest focus:shadow-focus-forest"
+          className="h-10 w-full rounded-control border border-border bg-white pl-9 pr-12 text-[13.5px] text-ink outline-none transition-shadow focus:border-forest focus:shadow-focus-forest"
         />
+        <span className="kbd pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" aria-hidden="true">⌘K</span>
       </div>}
 
       <div className="ml-auto flex w-full items-center justify-end gap-2 md:ml-0 md:w-auto">
       {showsExport && <button
         type="button"
         onClick={handleExportCSV}
-        className="flex h-10 flex-shrink-0 items-center gap-1.5 rounded-control border border-border bg-white px-3.5 text-[13.5px] font-semibold text-ink transition-colors hover:bg-chip"
+        className="flex h-10 flex-shrink-0 items-center gap-1.5 rounded-control border border-border bg-white px-3.5 text-[13.5px] font-semibold text-ink shadow-card transition-colors hover:bg-chip"
       >
         <Download size={16} />
         <span className="hidden sm:inline">Exportar</span>
@@ -107,7 +109,7 @@ export default function Header() {
       <button
         type="button"
         onClick={openCreate}
-        className="flex h-10 flex-shrink-0 items-center gap-1.5 rounded-control bg-forest px-4 text-[13.5px] font-semibold text-white transition-colors hover:bg-forest-hover"
+        className="flex h-10 flex-shrink-0 items-center gap-1.5 rounded-control bg-lime px-4 text-[13.5px] font-bold text-forest shadow-card transition-all duration-150 hover:bg-lime-strong active:scale-[0.98]"
       >
         <Plus size={17} />
         <span className="hidden sm:inline">Nova transação</span>

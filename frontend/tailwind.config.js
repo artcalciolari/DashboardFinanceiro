@@ -1,27 +1,33 @@
-/** @type {import('tailwindcss').Config} */
+﻿/** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
-        ink: '#12241D',
-        muted: '#5B6B63',
-        faint: '#8A978F',
+        ink: '#0F1F19',
+        muted: '#5A6861',
+        faint: '#8B968F',
         forest: {
-          DEFAULT: '#0C3B2E',
-          hover: '#0A3227',
+          DEFAULT: '#0B3529',
+          hover: '#082A20',
+          deep: '#06231B',
+          soft: '#EAF1ED',
         },
-        lime: '#C8F169',
-        paper: '#F4F2EC',
+        lime: {
+          DEFAULT: '#C8F169',
+          strong: '#B5E04C',
+          soft: '#F2FAD9',
+        },
+        paper: '#F5F4EF',
         card: '#FFFFFF',
         border: {
-          DEFAULT: '#E6E3DA',
-          faint: '#F2F0E8',
+          DEFAULT: '#E6E4DB',
+          faint: '#EFEDE4',
         },
-        chip: '#F0EEE6',
-        income: '#0F7A52',
-        expense: '#C0523B',
-        amber: '#B07A1E',
+        chip: '#EFEDE4',
+        income: '#0E7A50',
+        expense: '#BE4A33',
+        amber: '#A8741A',
         category: {
           moradia: '#0C3B2E',
           alimentacao: '#12664A',
@@ -36,14 +42,32 @@ export default {
         display: ['"Bricolage Grotesque"', 'system-ui', 'sans-serif'],
         sans: ['"Instrument Sans"', 'system-ui', '-apple-system', 'sans-serif'],
       },
+      fontSize: {
+        'display-xl': ['40px', { lineHeight: '44px', letterSpacing: '-0.02em', fontWeight: '700' }],
+        'display-lg': ['28px', { lineHeight: '34px', letterSpacing: '-0.015em', fontWeight: '700' }],
+        'display-md': ['22px', { lineHeight: '28px', letterSpacing: '-0.01em', fontWeight: '700' }],
+        eyebrow: ['11px', { lineHeight: '14px', letterSpacing: '0.07em', fontWeight: '600' }],
+      },
       borderRadius: {
-        card: '20px',
-        control: '12px',
-        pill: '20px',
+        card: '16px',
+        control: '10px',
+        pill: '999px',
       },
       boxShadow: {
-        modal: '0 24px 60px rgba(12,36,29,0.25)',
-        'focus-forest': '0 0 0 3px rgba(12,59,46,0.1)',
+        card: '0 1px 2px rgba(15,31,25,0.05)',
+        'card-hover': '0 10px 28px -10px rgba(15,31,25,0.14)',
+        popover: '0 12px 32px -8px rgba(15,31,25,0.18)',
+        modal: '0 24px 64px -12px rgba(6,35,27,0.35)',
+        'focus-forest': '0 0 0 3px rgba(11,53,41,0.12)',
+        'focus-lime': '0 0 0 3px rgba(200,241,105,0.35)',
+      },
+      transitionTimingFunction: {
+        'out-expo': 'cubic-bezier(0.22, 1, 0.36, 1)',
+      },
+      animation: {
+        'sc-rise': 'sc-rise .35s cubic-bezier(0.22,1,0.36,1) both',
+        'sc-fade': 'sc-fade .25s ease both',
+        'sc-scale-in': 'sc-scale-in .22s cubic-bezier(0.22,1,0.36,1) both',
       },
     },
   },

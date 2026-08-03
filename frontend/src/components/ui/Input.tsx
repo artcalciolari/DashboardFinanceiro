@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, forwardRef, useId } from 'react';
+﻿import { InputHTMLAttributes, forwardRef, useId } from 'react';
 import { clsx } from 'clsx';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -27,7 +27,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         aria-describedby={error ? errorId : undefined}
         {...props}
       />
-      {error && <p id={errorId} className="mt-1 text-xs text-expense">{error}</p>}
+      {error && <p id={errorId} className="mt-1.5 flex items-center gap-1 text-xs font-medium text-expense">{error}</p>}
       </div>
     );
   }

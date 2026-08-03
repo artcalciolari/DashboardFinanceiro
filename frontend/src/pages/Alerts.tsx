@@ -10,6 +10,9 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import FormError from '../components/ui/FormError';
+import Skeleton from '../components/ui/Skeleton';
+import EmptyState from '../components/ui/EmptyState';
+import { clsx } from 'clsx';
 
 interface FormState {
   name: string;
@@ -136,8 +139,8 @@ export default function Alerts() {
     <div>
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="font-display text-[24px] font-bold tracking-tight text-ink">Alertas</h1>
-          <p className="mt-1 text-sm text-muted">
+          <h1 className="font-display text-display-lg tracking-tight text-ink">Alertas</h1>
+          <p className="mt-1 text-[13.5px] text-muted">
             {alerts.length} alerta(s) · {attentionCount} exigindo atenção
           </p>
         </div>
@@ -148,42 +151,50 @@ export default function Alerts() {
       </div>
 
       {isLoading ? (
-        <div className="card py-8 text-center text-faint">Carregando...</div>
+        <div className="flex max-w-[720px] flex-col gap-3">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className="h-[88px] w-full rounded-2xl" />
+          ))}
+        </div>
       ) : alerts.length === 0 ? (
-        <div className="card py-8 text-center">
-          <Bell size={32} className="mx-auto mb-2 text-faint" />
-          <p className="mb-3 text-sm text-faint">Nenhum alerta configurado</p>
-          <Button variant="secondary" size="sm" onClick={openCreate}>Criar alerta</Button>
+        <div className="card max-w-[720px]">
+          <EmptyState icon={Bell} title="Nenhum alerta configurado" actionLabel="Criar alerta" onAction={openCreate} />
         </div>
       ) : (
         <div className="flex max-w-[720px] flex-col gap-3">
           {sortedAlerts.map((alert) => {
             const status = statusMap[alert.id];
             const pct = status ? Math.min(status.percentage, 100) : 0;
-            const accent = !alert.isActive
-              ? '#8A978F'
-              : status?.isTriggered
-                ? '#C0523B'
-                : status?.isWarning
-                  ? '#B07A1E'
-                  : '#0C3B2E';
-            const iconBg = !alert.isActive
-              ? '#F0EEE6'
-              : status?.isTriggered
-                ? '#FBEBE6'
-                : status?.isWarning
-                  ? '#FEF3C7'
-                  : '#E9F0EC';
 
             return (
               <div
                 key={alert.id}
-                className="flex items-start gap-3.5 rounded-2xl border border-border bg-card py-[18px] pl-5 pr-5"
-                style={{ borderLeft: `3px solid ${accent}` }}
+                className={clsx(
+                  'flex items-start gap-3.5 rounded-2xl border border-border bg-card py-[18px] pl-5 pr-5 border-l-[3px]',
+                  !alert.isActive && 'border-l-faint',
+                  alert.isActive &&
+                    (status?.isTriggered
+                      ? 'border-l-expense'
+                      : status?.isWarning
+                        ? 'border-l-amber'
+                        : 'border-l-forest')
+                )}
               >
                 <div
-                  className="flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[11px]"
-                  style={{ backgroundColor: iconBg, color: accent }}
+                  className={clsx(
+                    'flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[11px]',
+                    !alert.isActive && 'bg-chip text-faint',
+                    alert.isActive &&
+                      status?.isTriggered &&
+                      'bg-expense/10 text-expense',
+                    alert.isActive &&
+                      status?.isWarning &&
+                      !status?.isTriggered &&
+                      'bg-amber/10 text-amber',
+                    alert.isActive &&
+                      (!status || (!status.isTriggered && !status.isWarning)) &&
+                      'bg-forest-soft text-income'
+                  )}
                 >
                   {alert.isActive ? <Bell size={18} /> : <BellOff size={18} />}
                 </div>
@@ -208,14 +219,26 @@ export default function Alerts() {
                           {status.isTriggered && ' · limite ultrapassado'}
                           {status.isWarning && !status.isTriggered && ' · quase no limite'}
                         </span>
-                        <span className="font-semibold" style={{ color: accent }}>
+                        <span
+                          className={clsx(
+                            'font-semibold',
+                            status.isTriggered
+                              ? 'text-expense'
+                              : status.isWarning
+                                ? 'text-amber'
+                                : 'text-income'
+                          )}
+                        >
                           {Math.round(status.percentage)}%
                         </span>
                       </div>
-                      <div className="h-[7px] overflow-hidden rounded-pill bg-chip">
+                      <div className="h-1.5 overflow-hidden rounded-pill bg-chip">
                         <div
-                          className="h-full rounded-pill transition-all"
-                          style={{ width: `${pct}%`, backgroundColor: accent }}
+                          className={clsx(
+                            'h-full rounded-pill transition-[width] duration-500',
+                            status.isTriggered ? 'bg-expense' : status.isWarning ? 'bg-amber' : 'bg-forest'
+                          )}
+                          style={{ width: `${pct}%` }}
                         />
                       </div>
                     </div>

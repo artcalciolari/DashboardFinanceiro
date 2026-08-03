@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+﻿import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarClock, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -7,6 +7,7 @@ import { installmentsApi } from '../../services/api';
 import { useDate } from '../../context/DateContext';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import type { InstallmentGroup, Transaction } from '../../types';
+import Skeleton from '../ui/Skeleton';
 
 interface ActiveInstallmentView {
   group: InstallmentGroup;
@@ -64,7 +65,7 @@ export default function ActiveInstallmentsWidget() {
     <section className="card">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="flex items-center gap-2 font-display text-base font-semibold text-ink">
+          <h3 className="flex items-center gap-2 font-display text-[15px] font-semibold text-ink">
             <CalendarClock size={18} className="text-forest" />
             Comprometido este mês
           </h3>
@@ -82,7 +83,11 @@ export default function ActiveInstallmentsWidget() {
       </div>
 
       {isLoading ? (
-        <div className="py-8 text-center text-sm text-faint">Carregando...</div>
+        <div className="space-y-3">
+          <Skeleton className="h-[64px] w-full" />
+          <Skeleton className="h-[64px] w-full" />
+          <span className="sr-only">Carregando...</span>
+        </div>
       ) : activeInstallments.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border py-8 text-center text-sm text-faint">
           Nenhum parcelamento ativo
@@ -90,7 +95,7 @@ export default function ActiveInstallmentsWidget() {
       ) : (
         <div className="flex flex-col gap-[14px]">
           {visibleInstallments.map(({ group, paid, total, pct, next, remainingAmount }) => (
-            <div key={group.id}>
+            <div key={group.id} className="-mx-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-paper">
               <div className="mb-1.5 flex items-center justify-between gap-3">
                 <span className="truncate text-[13.5px] font-medium text-ink">{group.description}</span>
                 <span className="flex-shrink-0 text-[13px] text-faint">
@@ -98,9 +103,9 @@ export default function ActiveInstallmentsWidget() {
                   {next ? ` · ${formatDate(next.effectiveDate)}` : ''}
                 </span>
               </div>
-              <div className="h-[7px] overflow-hidden rounded-pill bg-chip">
+              <div className="h-2 overflow-hidden rounded-pill bg-chip">
                 <div
-                  className={clsx('h-full rounded-pill transition-all', pct >= 75 ? 'bg-income' : 'bg-forest')}
+                  className={clsx('h-full rounded-pill transition-[width] duration-500 ease-out-expo', pct >= 75 ? 'bg-income' : 'bg-forest')}
                   style={{ width: `${pct}%` }}
                 />
               </div>

@@ -1,17 +1,24 @@
-import { useQuery } from '@tanstack/react-query';
+﻿import { useQuery } from '@tanstack/react-query';
 import {
   ComposedChart,
   Bar,
   Line,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from 'recharts';
 import { summaryApi } from '../../services/api';
-import { formatCurrency } from '../../utils/formatters';
+import ChartTooltip from '../Charts/ChartTooltip';
+import Skeleton from '../ui/Skeleton';
+
+const LEGEND = [
+  { name: 'Receitas', color: '#3E9E72' },
+  { name: 'Despesas', color: '#E5A08B' },
+  { name: 'Acumulado', color: '#0B3529' },
+];
 
 export default function MonthlyChart() {
   const { data = [], isLoading } = useQuery({
@@ -31,49 +38,62 @@ export default function MonthlyChart() {
 
   return (
     <div className="card">
-      <div className="mb-1 flex items-start justify-between">
+      <div className="mb-4 flex items-start justify-between">
         <div>
-          <h3 className="font-display text-base font-semibold text-ink">Fluxo & saldo acumulado</h3>
-          <p className="mt-0.5 text-[12.5px] text-faint">Últimos 6 meses</p>
+          <div className="eyebrow">Últimos 6 meses</div>
+          <h3 className="mt-1 font-display text-[15px] font-semibold text-ink">Fluxo & saldo acumulado</h3>
+        </div>
+        <div className="flex items-center gap-3">
+          {LEGEND.map((item) => (
+            <span key={item.name} className="inline-flex items-center gap-1.5 text-[12px] text-muted">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+              {item.name}
+            </span>
+          ))}
         </div>
       </div>
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center text-faint">Carregando...</div>
+        <div>
+          <Skeleton className="h-[280px] w-full" />
+          <span className="sr-only">Carregando...</span>
+        </div>
       ) : (
-        <ResponsiveContainer width="100%" height={270}>
+        <ResponsiveContainer width="100%" height={280}>
           <ComposedChart data={chartData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 4" stroke="#F2F0E8" vertical={false} />
+            <defs>
+              <linearGradient id="cumGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#0B3529" stopOpacity={0.10} />
+                <stop offset="100%" stopColor="#0B3529" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="#ECEAE3" strokeDasharray="2 6" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 12, fill: '#8A978F', fontFamily: 'Instrument Sans' }}
-              axisLine={{ stroke: '#E6E3DA' }}
               tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 11.5, fill: '#8B968F' }}
+              dy={6}
             />
             <YAxis yAxisId="bars" hide />
             <YAxis yAxisId="line" orientation="right" hide />
-            <Tooltip
-              formatter={(value: number) => formatCurrency(value)}
-              labelStyle={{ fontWeight: 600, color: '#12241D' }}
-              contentStyle={{ borderRadius: 12, border: '1px solid #E6E3DA', fontSize: 13 }}
+            <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(11,53,41,0.04)' }} />
+            <Bar yAxisId="bars" dataKey="incomeCents" name="Receitas" fill="#3E9E72" radius={[6, 6, 0, 0]} barSize={20} />
+            <Bar yAxisId="bars" dataKey="expensesCents" name="Despesas" fill="#E5A08B" radius={[6, 6, 0, 0]} barSize={20} />
+            <Area
+              yAxisId="line"
+              type="monotone"
+              dataKey="cumulative"
+              stroke="none"
+              fill="url(#cumGradient)"
             />
-            <Legend
-              verticalAlign="top"
-              align="right"
-              height={28}
-              wrapperStyle={{ fontSize: 12, color: '#5B6B63' }}
-              iconType="square"
-              iconSize={9}
-            />
-            <Bar yAxisId="bars" dataKey="incomeCents" name="Receitas" fill="#7FC59E" radius={[4, 4, 0, 0]} barSize={18} />
-            <Bar yAxisId="bars" dataKey="expensesCents" name="Despesas" fill="#E0A594" radius={[4, 4, 0, 0]} barSize={18} />
             <Line
               yAxisId="line"
               type="monotone"
               dataKey="cumulative"
               name="Acumulado"
-              stroke="#0C3B2E"
+              stroke="#0B3529"
               strokeWidth={2.5}
-              dot={{ r: 4, fill: '#fff', stroke: '#0C3B2E', strokeWidth: 2.5 }}
+              dot={{ r: 3.5, fill: '#fff', stroke: '#0B3529', strokeWidth: 2.5 }}
               activeDot={{ r: 5 }}
             />
           </ComposedChart>

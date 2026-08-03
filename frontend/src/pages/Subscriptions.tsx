@@ -11,6 +11,8 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import FormError from '../components/ui/FormError';
+import Skeleton from '../components/ui/Skeleton';
+import EmptyState from '../components/ui/EmptyState';
 import { getLocalDateInput } from '../utils/formatters';
 
 interface FormState {
@@ -205,8 +207,8 @@ export default function Subscriptions() {
     <div>
       <div className="mb-5 flex items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-[24px] font-bold tracking-tight text-ink">Assinaturas</h1>
-          <p className="mt-1 text-sm capitalize text-muted">
+          <h1 className="font-display text-display-lg tracking-tight text-ink">Assinaturas</h1>
+          <p className="mt-1 text-[13.5px] capitalize text-muted">
             {activeCount} ativa(s) · {formatCurrency(monthlyTotal)} por mês
             {thirdPartyTotal > 0 && ` · terceiros ${formatCurrency(thirdPartyTotal)}`}
           </p>
@@ -218,14 +220,19 @@ export default function Subscriptions() {
       </div>
 
       {isLoading ? (
-        <div className="card py-8 text-center text-faint">Carregando...</div>
+        <div className="space-y-3">
+          {Array.from({ length: 5 }, (_, i) => (
+            <Skeleton key={i} className="h-[64px] w-full" />
+          ))}
+        </div>
       ) : subscriptions.length === 0 ? (
-        <div className="card py-8 text-center">
-          <RefreshCw size={32} className="mx-auto mb-2 text-faint" />
-          <p className="mb-3 text-sm text-faint">Nenhuma assinatura cadastrada</p>
-          <Button variant="secondary" size="sm" onClick={openCreate}>
-            Registrar assinatura
-          </Button>
+        <div className="card">
+          <EmptyState
+            icon={RefreshCw}
+            title="Nenhuma assinatura cadastrada"
+            actionLabel="Registrar assinatura"
+            onAction={openCreate}
+          />
         </div>
       ) : (
         <div className="overflow-hidden rounded-card border border-border bg-card">
@@ -237,17 +244,16 @@ export default function Subscriptions() {
                 key={subscription.id}
                 className="group flex items-center gap-3.5 border-b border-border-faint px-5 py-4 transition-colors last:border-b-0 hover:bg-[#FAF9F4]"
               >
-                <div
-                  className="flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-xl font-display text-[15px] font-bold"
-                  style={{ backgroundColor: `${subscription.category.color}20`, color: subscription.category.color }}
-                >
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[12px] bg-forest-soft font-display text-[13px] font-bold text-forest">
                   {initials(subscription.name)}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-[14.5px] font-semibold text-ink">{subscription.name}</p>
                     {!subscription.isActive && (
-                      <span className="rounded-pill bg-chip px-2 py-0.5 text-[10px] font-semibold text-muted">Inativa</span>
+                      <span className="rounded-pill bg-chip px-2 py-0.5 text-[10px] font-semibold text-faint">
+                        Inativa
+                      </span>
                     )}
                     {subscription.isThirdParty && (
                       <span className="rounded-pill bg-amber/10 px-2 py-0.5 text-[10px] font-semibold text-amber">
