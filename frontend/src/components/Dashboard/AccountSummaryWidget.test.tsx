@@ -1,5 +1,5 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import AccountSummaryWidget from './AccountSummaryWidget';
 import { renderWithProviders } from '@/test/test-utils';
 import { mockAccountSummaries } from '@/test/fixtures';
@@ -7,6 +7,7 @@ import { mockAccountSummaries } from '@/test/fixtures';
 const getAccounts = vi.fn();
 
 vi.mock('@/services/api', () => ({
+  getApiErrorMessage: () => 'offline',
   summaryApi: {
     getAccounts: (...a: unknown[]) => getAccounts(...a),
   },
@@ -59,4 +60,21 @@ describe('AccountSummaryWidget', () => {
     expect(screen.queryByText('XP')).not.toBeInTheDocument();
     expect(screen.getByText('BI')).toBeInTheDocument();
   });
+
+  it('retries after a query error', async () => {
+    getAccounts.mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce(mockAccountSummaries);
+    renderWithProviders(<AccountSummaryWidget />);
+    await waitFor(() => expect(screen.getByText('Não foi possível carregar as contas')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    await waitFor(() => expect(screen.getByText('Nubank')).toBeInTheDocument());
+  });
+
+  it('warns when cached accounts cannot refresh', async () => {
+    getAccounts.mockResolvedValueOnce(mockAccountSummaries).mockRejectedValueOnce(new Error('down'));
+    const { queryClient } = renderWithProviders(<AccountSummaryWidget />, { initialMonth: 1, initialYear: 2024 });
+    await waitFor(() => expect(screen.getByText('Nubank')).toBeInTheDocument());
+    await queryClient.invalidateQueries({ queryKey: ['summary', 'accounts', 1, 2024] });
+    await waitFor(() => expect(screen.getByText(/Exibindo dados salvos/)).toBeInTheDocument());
+  });
+
 });

@@ -21,7 +21,7 @@ describe('installments API', () => {
         id: 'g1',
         createdAt: new Date(),
         transactions: [
-          { id: 't1', installmentNumber: 1, amountCents: 100, effectiveDate: new Date(2026, 6, 10) },
+          { id: 't1', installmentNumber: 1, amountCents: 100, effectiveDate: new Date(2026, 6, 10), paidAt: new Date(2026, 6, 15) },
           { id: 't2', installmentNumber: 2, amountCents: 100, effectiveDate: new Date(2026, 8, 10) },
         ],
       },
@@ -38,6 +38,14 @@ describe('installments API', () => {
           { id: 't4', installmentNumber: 2, amountCents: 250, effectiveDate: new Date(2026, 6, 10) },
         ],
       },
+      {
+        id: 'g4',
+        installmentCount: 2,
+        createdAt: new Date(),
+        transactions: [
+          { id: 't5', installmentNumber: 1, amountCents: 75, effectiveDate: new Date(2026, 6, 10), paidAt: new Date(2026, 6, 11) },
+        ],
+      },
     ]);
     prisma.installmentGroup.count.mockResolvedValue(3);
 
@@ -48,12 +56,19 @@ describe('installments API', () => {
     expect(listed.body.items[1].installmentAmountCents).toBe(0);
     expect(listed.body.items[2].installmentAmountCents).toBe(250);
     expect(listed.body.items[2].futureCount).toBe(0);
+    expect(listed.body.items[3].installmentAmountCents).toBe(75);
+
+    const monthSummary = await request(app).get(`/api/installments?asOf=${asOf.toISOString()}&month=9&year=2026`);
+    expect(monthSummary.status).toBe(200);
+    expect(monthSummary.body.aggregates.committedMonthlyCents).toBe(100);
 
     expect((await request(app).get('/api/installments')).status).toBe(200);
 
     const invalid = await request(app).get('/api/installments?asOf=not-a-date');
     expect(invalid.status).toBe(422);
     expect(invalid.body.code).toBe('INVALID_AS_OF');
+
+    expect((await request(app).get('/api/installments?month=9')).status).toBe(422);
   });
 
   it('creates installment groups including third-party fields', async () => {
@@ -264,5 +279,50 @@ describe('installments API', () => {
     prisma.transaction.findMany.mockRejectedValue(new Error('db'));
     expect((await request(app).get('/api/installments/g1/transactions')).status).toBe(500);
     consoleSpy.mockRestore();
+  });
+
+  it('filters active groups before pagination and returns global aggregates', async () => {
+    const { createApp } = await import('../src/app');
+    const app = createApp();
+    const asOf = new Date('2026-08-31T23:59:59.999Z');
+    const groups = Array.from({ length: 101 }, (_, index) => ({
+      id: `g-${index}`,
+      description: `Grupo ${String(index).padStart(3, '0')}`,
+      installmentCount: 2,
+      isCancelled: index === 100,
+      createdAt: new Date(2026, 7, index % 20 + 1),
+      transactions: [
+        { id: `t-${index}`, amountCents: 100 + index, effectiveDate: new Date(2026, 8, 1 + (index % 10)), paidAt: null },
+        { id: `tp-${index}`, amountCents: 100, effectiveDate: new Date(2026, 6, 1), paidAt: new Date(2026, 6, 2) },
+      ],
+    }));
+    prisma.installmentGroup.findMany.mockResolvedValue(groups);
+    prisma.installmentGroup.count.mockResolvedValue(101);
+
+    const response = await request(app).get(`/api/installments?activeOnly=true&asOf=${asOf.toISOString()}&page=1&pageSize=2`);
+    expect(response.status).toBe(200);
+    expect(response.body.items).toHaveLength(2);
+    expect(response.body.pagination.total).toBe(100);
+    expect(response.body.aggregates.activeCount).toBe(100);
+    expect(response.body.aggregates.remainingAmountCents).toBeGreaterThan(10000);
+    expect(response.body.items.every((item: { isCancelled: boolean }) => !item.isCancelled)).toBe(true);
+  });
+
+  it('does not move settled installment dates', async () => {
+    const { createApp } = await import('../src/app');
+    const app = createApp();
+    prisma.installmentGroup.findUniqueOrThrow.mockResolvedValue({ id: 'g1', isCancelled: false });
+    prisma.transaction.findMany.mockResolvedValue([
+      { id: 'paid', installmentNumber: 1, effectiveDate: new Date('2026-08-10'), paidAt: new Date('2026-08-10'), reimbursedAmountCents: 0 },
+      { id: 'reimbursed', installmentNumber: 2, effectiveDate: new Date('2026-10-10'), paidAt: null, reimbursedAmountCents: 100 },
+      { id: 'open', installmentNumber: 3, effectiveDate: new Date('2026-12-10'), paidAt: null, reimbursedAmountCents: 0 },
+    ]);
+    prisma.transaction.update.mockResolvedValue({});
+    prisma.installmentGroup.findUnique.mockResolvedValue({ id: 'g1', transactions: [] });
+    prisma.$transaction.mockImplementation(async (operation: any) => operation(prisma));
+
+    expect((await request(app).patch('/api/installments/g1/payment-date').send({ firstPaymentDate: '2026-11-01' })).status).toBe(200);
+    expect(prisma.transaction.update).toHaveBeenCalledTimes(1);
+    expect(prisma.transaction.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'open' } }));
   });
 });

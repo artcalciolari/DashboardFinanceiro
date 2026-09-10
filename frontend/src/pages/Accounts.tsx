@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, CreditCard, Building2, Wallet, TrendingUp } from 'lucide-react';
-import { accountsApi } from '../services/api';
+import { accountsApi, getApiErrorMessage } from '../services/api';
 import { centsToInput, formatCurrency, parseCurrencyBR, ACCOUNT_TYPE_LABELS } from '../utils/formatters';
 import type { Account, AccountType } from '../types';
 import Modal from '../components/ui/Modal';
@@ -48,7 +48,7 @@ export default function Accounts() {
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
 
-  const { data: accounts = [], isLoading } = useQuery({
+  const { data: accounts = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['accounts'],
     queryFn: accountsApi.getAll,
   });
@@ -155,6 +155,8 @@ export default function Accounts() {
           ))}
           <span className="sr-only">Carregando...</span>
         </div>
+      ) : isError ? (
+        <div className="card py-10 text-center"><p className="text-sm text-ink">Não foi possível carregar as contas</p><p className="mt-1 text-xs text-faint">{getApiErrorMessage(error)}</p><Button variant="secondary" size="sm" className="mt-3" onClick={() => refetch()}>Tentar novamente</Button></div>
       ) : accounts.length === 0 ? (
         <div className="card">
           <EmptyState

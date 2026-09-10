@@ -1,5 +1,5 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import MonthlyChart from './MonthlyChart';
 import { renderWithProviders } from '@/test/test-utils';
 import { mockEvolution } from '@/test/fixtures';
@@ -7,6 +7,7 @@ import { mockEvolution } from '@/test/fixtures';
 const getEvolution = vi.fn();
 
 vi.mock('@/services/api', () => ({
+  getApiErrorMessage: () => 'offline',
   summaryApi: {
     getEvolution: () => getEvolution(),
   },
@@ -47,4 +48,21 @@ describe('MonthlyChart', () => {
     resolve(mockEvolution);
     await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
   });
+
+  it('shows an error and retries successfully', async () => {
+    getEvolution.mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce(mockEvolution);
+    renderWithProviders(<MonthlyChart />);
+    await waitFor(() => expect(screen.getByText('Não foi possível carregar o gráfico')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+  });
+
+  it('warns when cached data refresh fails', async () => {
+    getEvolution.mockResolvedValueOnce(mockEvolution).mockRejectedValueOnce(new Error('down'));
+    const { queryClient } = renderWithProviders(<MonthlyChart />);
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    await queryClient.invalidateQueries({ queryKey: ['summary', 'evolution'] });
+    await waitFor(() => expect(screen.getByText(/Exibindo dados salvos/)).toBeInTheDocument());
+  });
+
 });

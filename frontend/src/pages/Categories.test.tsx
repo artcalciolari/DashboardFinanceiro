@@ -29,6 +29,15 @@ describe('Categories', () => {
     remove.mockReset().mockResolvedValue({});
   });
 
+  it('shows category load error and retries', async () => {
+    const user = userEvent.setup();
+    getAll.mockRejectedValueOnce(new Error('offline')).mockResolvedValue([]);
+    renderWithProviders(<Categories />);
+    await waitFor(() => expect(screen.getByText('Não foi possível carregar as categorias')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    await waitFor(() => expect(getAll).toHaveBeenCalledTimes(2));
+  });
+
   it('shows empty columns then CRUD', async () => {
     const user = userEvent.setup();
     getAll.mockResolvedValue([]);

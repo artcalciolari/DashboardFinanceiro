@@ -1,15 +1,16 @@
 ﻿import { useQuery } from '@tanstack/react-query';
 import { PieChart } from 'lucide-react';
-import { summaryApi } from '../../services/api';
+import { summaryApi, getApiErrorMessage } from '../../services/api';
 import { useDate } from '../../context/DateContext';
 import { formatCurrency } from '../../utils/formatters';
 import EmptyState from '../ui/EmptyState';
 import Skeleton from '../ui/Skeleton';
+import Button from '../ui/Button';
 
 export default function CategoryChart() {
   const { month, year } = useDate();
 
-  const { data = [], isLoading } = useQuery({
+  const { data = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['summary', 'categories', month, year],
     queryFn: () => summaryApi.getCategories(month, year),
   });
@@ -38,10 +39,13 @@ export default function CategoryChart() {
           <Skeleton className="h-[280px] w-full" />
           <span className="sr-only">Carregando...</span>
         </div>
+      ) : isError && expenseData.length === 0 ? (
+        <div className="py-10 text-center"><p className="text-sm text-ink">Não foi possível carregar as categorias</p><p className="mt-1 text-xs text-faint">{getApiErrorMessage(error)}</p><Button variant="secondary" size="sm" className="mt-3" onClick={() => refetch()}>Tentar novamente</Button></div>
       ) : expenseData.length === 0 ? (
         <EmptyState icon={PieChart} title="Nenhuma despesa neste mês" />
       ) : (
         <div className="flex flex-col gap-[15px]">
+          {isError && <p className="rounded-lg bg-amber/10 px-3 py-2 text-xs text-amber">Exibindo dados salvos. Não foi possível atualizar agora.</p>}
           {expenseData.map((item) => {
             const share = Math.round((item.totalCents / totalExpenses) * 100);
             return (

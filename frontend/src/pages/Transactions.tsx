@@ -16,6 +16,10 @@ import { clsx } from 'clsx';
 type TypeFilter = 'all' | 'INCOME' | 'EXPENSE';
 type OriginFilter = 'all' | 'single' | 'installment' | 'subscription' | 'thirdParty';
 
+function localDateInputValue(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 const originOptions: { key: OriginFilter; label: string }[] = [
   { key: 'all', label: 'Todas as origens' },
   { key: 'single', label: 'Lançamentos avulsos' },
@@ -36,6 +40,13 @@ export default function Transactions() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [originFilter, setOriginFilter] = useState<OriginFilter>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [reimbursementTarget, setReimbursementTarget] = useState<string | null>(null);
+  const [reimbursementAmount, setReimbursementAmount] = useState('');
+  const [reimbursementDate, setReimbursementDate] = useState('');
+  const [reimbursementError, setReimbursementError] = useState('');
+  const [paymentDate, setPaymentDate] = useState('');
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentTarget, setPaymentTarget] = useState<string | null>(null);
 
   const deferredSearch = useDeferredValue(search.trim());
   const transactionQuery = useInfiniteQuery({
@@ -71,6 +82,73 @@ export default function Transactions() {
       setDeleteTarget(null);
     },
   });
+
+  const reimbursementMutation = useMutation({
+    mutationFn: ({ id, amount, date }: { id: string; amount: number; date: string | null }) =>
+      transactionsApi.reimburse(id, amount, date),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: ['summary'] });
+      setReimbursementTarget(null);
+    },
+  });
+  const settlementMutation = useMutation({
+    mutationFn: ({ id, date }: { id: string; date: string | null }) => transactionsApi.settle(id, date),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['transactions'] });
+      qc.invalidateQueries({ queryKey: ['summary'] });
+      qc.invalidateQueries({ queryKey: ['installments'] });
+      setPaymentTarget(null);
+    },
+  });
+
+  function openReimbursement(t: Transaction) {
+    reimbursementMutation.reset();
+    setReimbursementTarget(t.id);
+    setReimbursementAmount(String((t.reimbursedAmountCents ?? (t.isReimbursed ? t.amountCents : 0)) / 100).replace('.', ','));
+    setReimbursementDate(t.reimbursedAt?.slice(0, 10) ?? localDateInputValue());
+    setReimbursementError('');
+  }
+
+  function submitReimbursement(t: Transaction) {
+    const amount = Math.round(Number(reimbursementAmount.replace(',', '.')) * 100);
+    if (!Number.isFinite(amount) || amount < 0 || amount > t.amountCents) {
+      setReimbursementError('Informe um valor entre zero e o total da despesa.');
+      return;
+    }
+    if (amount > 0 && !reimbursementDate) {
+      setReimbursementError('Informe a data do reembolso.');
+      return;
+    }
+    const parsedDate = amount === 0 ? NaN : Date.parse(`${reimbursementDate}T00:00:00`);
+    if (amount > 0 && (!Number.isFinite(parsedDate) || reimbursementDate > localDateInputValue())) {
+      setReimbursementError('A data do reembolso deve ser válida e não pode ser futura.');
+      return;
+    }
+    const date = amount === 0 ? null : reimbursementDate === localDateInputValue() ? new Date().toISOString() : new Date(parsedDate).toISOString();
+    reimbursementMutation.mutate({ id: t.id, amount, date });
+  }
+
+  function openPayment(t: Transaction) {
+    settlementMutation.reset();
+    setPaymentTarget(t.id);
+    setPaymentDate(t.paidAt?.slice(0, 10) ?? localDateInputValue());
+    setPaymentError('');
+  }
+
+  function submitPayment(t: Transaction, date: string) {
+    if (!date) {
+      setPaymentError('Informe a data do pagamento.');
+      return;
+    }
+      const parsedDate = Date.parse(`${date}T12:00:00`);
+      if (!Number.isFinite(parsedDate) || date > localDateInputValue()) {
+        setPaymentError('A data do pagamento deve ser válida e não pode ser futura.');
+        return;
+      }
+      const iso = date === localDateInputValue() ? new Date().toISOString() : new Date(parsedDate).toISOString();
+      settlementMutation.mutate({ id: t.id, date: iso });
+  }
 
   const filtered = transactions;
 
@@ -327,17 +405,45 @@ export default function Transactions() {
                     )}
                     {t.isThirdParty && (
                       <span className="rounded-pill bg-amber/10 px-2 py-0.5 text-[11px] font-semibold text-amber">
-                        {t.isReimbursed ? 'Reembolsado' : 'A receber'}
+                        {(t.reimbursedAmountCents ?? (t.isReimbursed ? t.amountCents : 0)) >= t.amountCents ? 'Reembolsado' : (t.reimbursedAmountCents ?? 0) > 0 ? 'Parcialmente reembolsado' : 'A receber'}
                         {t.thirdPartyName ? `: ${t.thirdPartyName}` : ''}
                       </span>
                     )}
                   </div>
+                  {t.isThirdParty && t.type === 'EXPENSE' && (
+                    reimbursementTarget === t.id ? (
+                      <div className="mt-2 flex flex-wrap items-end justify-end gap-2 text-left">
+                        <label className="text-[11px] text-faint">Valor<input aria-label="Valor reembolsado" className="ml-1 h-7 w-24 rounded border border-border px-2 text-xs" value={reimbursementAmount} onChange={(e) => { setReimbursementAmount(e.target.value); setReimbursementError(''); }} /></label>
+                        <label className="text-[11px] text-faint">Data<input aria-label="Data do reembolso" type="date" max={localDateInputValue()} className="ml-1 h-7 rounded border border-border px-2 text-xs" value={reimbursementDate} onChange={(e) => { setReimbursementDate(e.target.value); setReimbursementError(''); }} /></label>
+                        <button type="button" disabled={reimbursementMutation.isPending} className="h-7 rounded bg-forest px-2 text-xs font-semibold text-white disabled:opacity-50" onClick={() => submitReimbursement(t)}>{reimbursementMutation.isPending ? 'Salvando…' : 'Salvar'}</button>
+                        <button type="button" disabled={reimbursementMutation.isPending} className="h-7 rounded border border-border px-2 text-xs disabled:opacity-50" onClick={() => { setReimbursementTarget(null); reimbursementMutation.reset(); }}>Cancelar</button>
+                        {reimbursementError && <p className="basis-full text-[11px] text-expense">{reimbursementError}</p>}
+                        {reimbursementMutation.error && <p className="basis-full text-[11px] text-expense">{getApiErrorMessage(reimbursementMutation.error)}</p>}
+                      </div>
+                    ) : (
+                      <button type="button" className="mt-1 text-[11px] font-semibold text-forest hover:underline" onClick={() => openReimbursement(t)}>
+                        Registrar reembolso
+                      </button>
+                    )
+                  )}
                 </div>
                 <div className="flex-shrink-0 text-right">
                   <div className={clsx('tabular font-display text-[15px] font-bold', t.type === 'INCOME' ? 'text-income' : 'text-expense')}>
                     {t.type === 'INCOME' ? '+ ' : '- '}{formatCurrency(t.amountCents)}
                   </div>
                   <div className="mt-0.5 text-[11.5px] text-faint">{formatDate(t.effectiveDate)}</div>
+                  {t.type === 'EXPENSE' && (paymentTarget === t.id ? (
+                    <div className="mt-1 flex items-center justify-end gap-1">
+                      <input aria-label="Data do pagamento" type="date" max={localDateInputValue()} className="h-7 rounded border border-border px-1 text-[11px]" value={paymentDate} onChange={(e) => { setPaymentDate(e.target.value); setPaymentError(''); }} />
+                      <button type="button" disabled={settlementMutation.isPending} className="h-7 rounded bg-forest px-2 text-[11px] font-semibold text-white disabled:opacity-50" onClick={() => submitPayment(t, paymentDate)}>{settlementMutation.isPending ? 'Salvando…' : 'Salvar'}</button>
+                      {t.paidAt && <button type="button" disabled={settlementMutation.isPending} className="h-7 rounded border border-border px-2 text-[11px] disabled:opacity-50" onClick={() => settlementMutation.mutate({ id: t.id, date: null })}>Estornar pagamento</button>}
+                      {(paymentError || settlementMutation.error) && <p className="basis-full text-[11px] text-expense">{paymentError || getApiErrorMessage(settlementMutation.error)}</p>}
+                    </div>
+                  ) : (
+                    <button type="button" className="mt-1 text-[11px] font-semibold text-forest hover:underline" onClick={() => openPayment(t)}>
+                      {t.paidAt ? `Pago em ${formatDate(t.paidAt)}` : 'Registrar pagamento'}
+                    </button>
+                  ))}
                 </div>
                 {!t.installmentGroupId && !t.subscriptionId && (
                 <div className="flex flex-shrink-0 gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">

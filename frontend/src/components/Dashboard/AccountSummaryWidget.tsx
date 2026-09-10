@@ -1,9 +1,10 @@
 ﻿import { useQuery } from '@tanstack/react-query';
-import { summaryApi } from '../../services/api';
+import { summaryApi, getApiErrorMessage } from '../../services/api';
 import { useDate } from '../../context/DateContext';
 import { formatCurrency, ACCOUNT_TYPE_LABELS } from '../../utils/formatters';
 import { clsx } from 'clsx';
 import Skeleton from '../ui/Skeleton';
+import Button from '../ui/Button';
 
 function initials(name: string) {
   return name
@@ -18,7 +19,7 @@ function initials(name: string) {
 export default function AccountSummaryWidget() {
   const { month, year } = useDate();
 
-  const { data = [], isLoading } = useQuery({
+  const { data = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['summary', 'accounts', month, year],
     queryFn: () => summaryApi.getAccounts(month, year),
   });
@@ -41,10 +42,13 @@ export default function AccountSummaryWidget() {
           <Skeleton className="h-[64px] w-full" />
           <span className="sr-only">Carregando...</span>
         </div>
+      ) : isError && data.length === 0 ? (
+        <div className="py-8 text-center"><p className="text-sm text-ink">Não foi possível carregar as contas</p><p className="mt-1 text-xs text-faint">{getApiErrorMessage(error)}</p><Button variant="secondary" size="sm" className="mt-3" onClick={() => refetch()}>Tentar novamente</Button></div>
       ) : withMovement.length === 0 ? (
         <div className="py-8 text-center text-sm text-faint">Nenhuma movimentação por conta neste mês</div>
       ) : (
         <div className="flex flex-col gap-1">
+          {isError && <p className="mb-2 rounded-lg bg-amber/10 px-3 py-2 text-xs text-amber">Exibindo dados salvos. Não foi possível atualizar agora.</p>}
           {withMovement.map(({ account, incomeCents, expensesCents, invoiceExpensesCents, receivableCents, netCents }) => (
             <div key={account.id} className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-paper">
               <div

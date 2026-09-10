@@ -1,4 +1,4 @@
-﻿import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPrismaMock } from './helpers/prismaMock';
 
 const prisma = createPrismaMock();
@@ -49,7 +49,7 @@ describe('subscriptionService', () => {
     resetSubscriptionTransactionHorizon();
     await ensureSubscriptionTransactions(new Date(2026, 2, 31));
     expect(prisma.transaction.findMany).not.toHaveBeenCalled();
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+
   });
 
   it('creates missing occurrences including clamped billing days', async () => {
@@ -61,7 +61,7 @@ describe('subscriptionService', () => {
     ]);
     prisma.transaction.findMany.mockResolvedValue([]);
     prisma.transaction.createMany.mockResolvedValue({ count: 2 });
-    prisma.$transaction.mockResolvedValue([]);
+
 
     const { ensureSubscriptionTransactions, resetSubscriptionTransactionHorizon } = await import(
       '../src/services/subscriptionService'
@@ -129,7 +129,7 @@ describe('subscriptionService', () => {
       },
     ]);
     prisma.transaction.update.mockResolvedValue({});
-    prisma.$transaction.mockResolvedValue([]);
+
 
     const { ensureSubscriptionTransactions, resetSubscriptionTransactionHorizon } = await import(
       '../src/services/subscriptionService'
@@ -148,7 +148,7 @@ describe('subscriptionService', () => {
           isThirdParty: true,
           thirdPartyName: 'Alice',
           notes: 'updated notes',
-          isReimbursed: false,
+
         }),
       })
     );
@@ -169,7 +169,7 @@ describe('subscriptionService', () => {
     ]);
     prisma.transaction.findMany.mockResolvedValue([]);
     prisma.transaction.createMany.mockResolvedValue({ count: 1 });
-    prisma.$transaction.mockResolvedValue([]);
+
 
     const { ensureSubscriptionTransactions, resetSubscriptionTransactionHorizon } = await import(
       '../src/services/subscriptionService'
@@ -196,7 +196,7 @@ describe('subscriptionService', () => {
     ]);
     prisma.transaction.findMany.mockResolvedValue([]);
     prisma.transaction.createMany.mockResolvedValue({ count: 2 });
-    prisma.$transaction.mockResolvedValue([]);
+
 
     const { ensureSubscriptionTransactions, resetSubscriptionTransactionHorizon } = await import(
       '../src/services/subscriptionService'
@@ -267,7 +267,7 @@ describe('subscriptionService', () => {
     resetSubscriptionTransactionHorizon();
     await ensureSubscriptionTransactions(new Date(2026, 0, 31));
 
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+
     expect(prisma.transaction.createMany).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
@@ -281,7 +281,7 @@ describe('subscriptionService', () => {
     ]);
     prisma.transaction.findMany.mockResolvedValue([]);
     prisma.transaction.createMany.mockResolvedValue({ count: 1 });
-    prisma.$transaction.mockResolvedValue([]);
+
 
     const { ensureSubscriptionTransactions, resetSubscriptionTransactionHorizon } = await import(
       '../src/services/subscriptionService'

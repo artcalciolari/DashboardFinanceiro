@@ -10,9 +10,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { summaryApi } from '../../services/api';
+import { summaryApi, getApiErrorMessage } from '../../services/api';
 import ChartTooltip from '../Charts/ChartTooltip';
 import Skeleton from '../ui/Skeleton';
+import Button from '../ui/Button';
 
 const LEGEND = [
   { name: 'Receitas', color: '#3E9E72' },
@@ -21,7 +22,7 @@ const LEGEND = [
 ];
 
 export default function MonthlyChart() {
-  const { data = [], isLoading } = useQuery({
+  const { data = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['summary', 'evolution'],
     queryFn: summaryApi.getEvolution,
   });
@@ -57,7 +58,11 @@ export default function MonthlyChart() {
           <Skeleton className="h-[280px] w-full" />
           <span className="sr-only">Carregando...</span>
         </div>
+      ) : isError && data.length === 0 ? (
+        <div className="py-10 text-center"><p className="text-sm text-ink">Não foi possível carregar o gráfico</p><p className="mt-1 text-xs text-faint">{getApiErrorMessage(error)}</p><Button variant="secondary" size="sm" className="mt-3" onClick={() => refetch()}>Tentar novamente</Button></div>
       ) : (
+        <>
+        {isError && <p className="mb-2 rounded-lg bg-amber/10 px-3 py-2 text-xs text-amber">Exibindo dados salvos. Não foi possível atualizar agora.</p>}
         <ResponsiveContainer width="100%" height={280}>
           <ComposedChart data={chartData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
             <defs>
@@ -98,6 +103,7 @@ export default function MonthlyChart() {
             />
           </ComposedChart>
         </ResponsiveContainer>
+        </>
       )}
     </div>
   );

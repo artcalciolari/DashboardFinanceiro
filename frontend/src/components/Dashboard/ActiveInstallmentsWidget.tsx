@@ -4,10 +4,12 @@ import { CalendarClock, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { installmentsApi } from '../../services/api';
+import { getApiErrorMessage } from '../../services/api';
 import { useDate } from '../../context/DateContext';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import type { InstallmentGroup, Transaction } from '../../types';
 import Skeleton from '../ui/Skeleton';
+import Button from '../ui/Button';
 
 interface ActiveInstallmentView {
   group: InstallmentGroup;
@@ -36,13 +38,13 @@ function buildActiveInstallment(group: InstallmentGroup): ActiveInstallmentView 
 export default function ActiveInstallmentsWidget() {
   const { month, year } = useDate();
   const selectedPeriodEnd = useMemo(
-    () => new Date(year, month, 0, 23, 59, 59, 999),
+    () => new Date(Math.min(new Date(year, month, 0, 23, 59, 59, 999).getTime(), Date.now())),
     [month, year]
   );
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['installments', 'dashboard', month, year],
-    queryFn: () => installmentsApi.getPage(1, 100, selectedPeriodEnd.toISOString()),
+    queryFn: () => installmentsApi.getPage(1, 5, selectedPeriodEnd.toISOString(), true, month, year),
   });
   const groups = data?.items ?? [];
 
@@ -59,7 +61,8 @@ export default function ActiveInstallmentsWidget() {
   }, [groups]);
 
   const visibleInstallments = activeInstallments.slice(0, 5);
-  const remainingTotal = activeInstallments.reduce((sum, view) => sum + view.remainingAmount, 0);
+  const remainingTotal = data?.aggregates?.remainingAmountCents ?? activeInstallments.reduce((sum, view) => sum + view.remainingAmount, 0);
+  const activeCount = data?.aggregates?.activeCount ?? activeInstallments.length;
 
   return (
     <section className="card">
@@ -70,7 +73,7 @@ export default function ActiveInstallmentsWidget() {
             Comprometido este mês
           </h3>
           <p className="mt-0.5 text-[12.5px] text-faint">
-            {activeInstallments.length} parcelamento(s) ativo(s) · restam {formatCurrency(remainingTotal)}
+            {activeCount} parcelamento(s) ativo(s) · restam {formatCurrency(remainingTotal)}
           </p>
         </div>
         <Link
@@ -88,12 +91,19 @@ export default function ActiveInstallmentsWidget() {
           <Skeleton className="h-[64px] w-full" />
           <span className="sr-only">Carregando...</span>
         </div>
+      ) : isError && !data ? (
+        <div className="rounded-xl border border-expense/20 bg-expense/5 px-4 py-6 text-center">
+          <p className="text-sm font-medium text-ink">Não foi possível carregar os parcelamentos</p>
+          <p className="mt-1 text-xs text-faint">{getApiErrorMessage(error)}</p>
+          <Button variant="secondary" size="sm" className="mt-3" onClick={() => refetch()}>Tentar novamente</Button>
+        </div>
       ) : activeInstallments.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border py-8 text-center text-sm text-faint">
           Nenhum parcelamento ativo
         </div>
       ) : (
         <div className="flex flex-col gap-[14px]">
+          {isError && data && <p className="rounded-lg bg-amber/10 px-3 py-2 text-xs text-amber">Exibindo dados salvos. Não foi possível atualizar agora.</p>}
           {visibleInstallments.map(({ group, paid, total, pct, next, remainingAmount }) => (
             <div key={group.id} className="-mx-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-paper">
               <div className="mb-1.5 flex items-center justify-between gap-3">
@@ -112,12 +122,12 @@ export default function ActiveInstallmentsWidget() {
             </div>
           ))}
 
-          {activeInstallments.length > visibleInstallments.length && (
+          {activeCount > visibleInstallments.length && (
             <Link
               to="/installments"
               className="block rounded-xl border border-dashed border-border px-3 py-2 text-center text-xs font-semibold text-muted transition-colors hover:border-forest/30 hover:text-forest"
             >
-              Ver mais {activeInstallments.length - visibleInstallments.length} parcelamento(s)
+              Ver mais {activeCount - visibleInstallments.length} parcelamento(s)
             </Link>
           )}
         </div>

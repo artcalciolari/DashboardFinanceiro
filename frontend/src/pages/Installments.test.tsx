@@ -100,6 +100,24 @@ describe('Installments', () => {
     getCategories.mockResolvedValue([mockExpenseCategory]);
   });
 
+  it('shows installment load error and retries', async () => {
+    const user = userEvent.setup();
+    getPage.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(makeInstallmentsPage([]));
+    renderWithProviders(<Installments />);
+    await waitFor(() => expect(screen.getByText('Não foi possível carregar os parcelamentos')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    await waitFor(() => expect(getPage).toHaveBeenCalledTimes(2));
+  });
+
+  it('falls back to item totals and warns when cached data cannot refresh', async () => {
+    const page = makeInstallmentsPage([mockInstallmentGroup]);
+    getPage.mockResolvedValueOnce({ ...page, aggregates: {} }).mockRejectedValueOnce(new Error('down'));
+    const { queryClient } = renderWithProviders(<Installments />);
+    await waitFor(() => expect(screen.getByText(/por mês comprometidos/)).toHaveTextContent('R$ 300,00'));
+    await queryClient.invalidateQueries({ queryKey: ['installments'] });
+    await waitFor(() => expect(screen.getByText(/Exibindo dados salvos/)).toBeInTheDocument());
+  });
+
   it('empty state and create with third party + credit card tips', async () => {
     const user = userEvent.setup();
     getPage.mockResolvedValue(makeInstallmentsPage([]));

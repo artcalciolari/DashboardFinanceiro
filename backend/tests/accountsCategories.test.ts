@@ -1,4 +1,4 @@
-﻿import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { createPrismaMock } from './helpers/prismaMock';
 
@@ -9,6 +9,7 @@ vi.mock('../src/services/subscriptionService', () => ({
   ensureSubscriptionTransactions: vi.fn().mockResolvedValue(undefined),
   getSubscriptionHorizon: vi.fn(() => new Date(2027, 7, 31, 23, 59, 59)),
   resetSubscriptionTransactionHorizon: vi.fn(),
+  synchronizeSubscriptionTransactions: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../src/services/accountCycleService', () => ({
   recalculateAccountEffectiveDates: vi.fn().mockResolvedValue(undefined),
@@ -39,6 +40,18 @@ describe('categories and accounts API', () => {
 
     prisma.category.delete.mockResolvedValue({});
     expect((await request(app).delete('/api/categories/c2')).status).toBe(204);
+  });
+
+  it('allows an unused category to change type but preserves categories in use', async () => {
+    const { createApp } = await import('../src/app');
+    const app = createApp();
+    prisma.category.findUniqueOrThrow.mockResolvedValue({ type: 'EXPENSE', _count: { transactions: 1, subscriptions: 0, installmentGroups: 0, alerts: 0 } });
+    expect((await request(app).patch('/api/categories/c1').send({ type: 'INCOME' })).status).toBe(409);
+    expect(prisma.category.update).not.toHaveBeenCalled();
+    prisma.category.update.mockResolvedValue({ id: 'c1' });
+    expect((await request(app).patch('/api/categories/c1').send({ type: 'EXPENSE' })).status).toBe(200);
+    prisma.category.findUniqueOrThrow.mockResolvedValue({ type: 'EXPENSE', _count: { transactions: 0, subscriptions: 0, installmentGroups: 0, alerts: 0 } });
+    expect((await request(app).patch('/api/categories/c1').send({ type: 'INCOME' })).status).toBe(200);
   });
 
   it('lists, creates, updates and deletes accounts including cycle recalc', async () => {

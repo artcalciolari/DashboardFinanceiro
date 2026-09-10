@@ -14,6 +14,7 @@ import type {
   PageResponse,
   TransactionPageResponse,
   SubscriptionPageResponse,
+  InstallmentAggregates,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL
@@ -76,13 +77,19 @@ export const transactionsApi = {
   update: (id: string, data: Partial<Transaction>) =>
     api.patch<Transaction>(`/transactions/${id}`, data).then((r) => r.data),
   delete: (id: string) => api.delete(`/transactions/${id}`),
+  settle: (id: string, paidAt: string | null) =>
+    api.patch<Transaction>(`/transactions/${id}/settlement`, { paidAt }).then((r) => r.data),
+  reimburse: (id: string, reimbursedAmountCents: number, reimbursedAt: string | null) =>
+    api.patch<Transaction>(`/transactions/${id}/reimbursement`, { reimbursedAmountCents, reimbursedAt }).then((r) => r.data),
 };
 
 // ─── Installments ────────────────────────────────────────────────────────────
 
 export const installmentsApi = {
-  getPage: (page = 1, pageSize = 25, asOf?: string) =>
-    api.get<PageResponse<InstallmentGroup>>('/installments', { params: { page, pageSize, asOf } }).then((r) => r.data),
+  getPage: (page = 1, pageSize = 25, asOf?: string, activeOnly = false, month?: number, year?: number) =>
+    api.get<PageResponse<InstallmentGroup> & { aggregates?: InstallmentAggregates }>('/installments', {
+      params: { page, pageSize, asOf, ...(activeOnly ? { activeOnly: true } : {}), ...(month !== undefined ? { month, year } : {}) },
+    }).then((r) => r.data),
   create: (data: {
     description: string;
     totalAmountCents: number;

@@ -141,8 +141,12 @@ describe('api service', () => {
       await transactionsApi.create({ description: 'x' });
       await transactionsApi.update('1', { description: 'y' });
       await transactionsApi.delete('1');
+      await transactionsApi.settle('1', '2024-06-15T12:00:00.000Z');
+      await transactionsApi.reimburse('1', 500, '2024-06-16T12:00:00.000Z');
       expect(mockPost).toHaveBeenCalled();
       expect(mockPatch).toHaveBeenCalledWith('/transactions/1', { description: 'y' });
+      expect(mockPatch).toHaveBeenCalledWith('/transactions/1/settlement', { paidAt: '2024-06-15T12:00:00.000Z' });
+      expect(mockPatch).toHaveBeenCalledWith('/transactions/1/reimbursement', { reimbursedAmountCents: 500, reimbursedAt: '2024-06-16T12:00:00.000Z' });
       expect(mockDelete).toHaveBeenCalledWith('/transactions/1');
     });
 
@@ -161,6 +165,11 @@ describe('api service', () => {
       await installmentsApi.getPage();
       expect(mockGet).toHaveBeenCalledWith('/installments', {
         params: { page: 1, pageSize: 25, asOf: undefined },
+      });
+
+      await installmentsApi.getPage(1, 5, undefined, true, 6, 2024);
+      expect(mockGet).toHaveBeenCalledWith('/installments', {
+        params: { page: 1, pageSize: 5, asOf: undefined, activeOnly: true, month: 6, year: 2024 },
       });
 
       await installmentsApi.create({

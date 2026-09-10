@@ -76,14 +76,6 @@ db_user="$(docker exec "$DB_CONTAINER" printenv POSTGRES_USER)"
 db_name="$(docker exec "$DB_CONTAINER" printenv POSTGRES_DB)"
 docker exec "$DB_CONTAINER" pg_isready -U "$db_user" -d "$db_name" >/dev/null
 
-echo "Creating PostgreSQL backup: $backup"
-docker exec "$DB_CONTAINER" pg_dump -U "$db_user" -d "$db_name" \
-  --format=custom --no-owner --no-acl \
-  > "$backup_tmp"
-docker exec -i "$DB_CONTAINER" pg_restore --list < "$backup_tmp" >/dev/null
-mv "$backup_tmp" "$backup"
-backup_verified=1
-
 money_migration_applied="$(docker exec "$DB_CONTAINER" psql -At -U "$db_user" -d "$db_name" -c \
   "SELECT EXISTS (SELECT 1 FROM \"_prisma_migrations\" WHERE migration_name = '1_money_integrity_and_indexes' AND finished_at IS NOT NULL AND rolled_back_at IS NULL);")"
 
@@ -96,7 +88,7 @@ else
 fi
 
 row_count_query='SELECT (SELECT count(*) FROM "Account"),(SELECT count(*) FROM "Category"),(SELECT count(*) FROM "Transaction"),(SELECT count(*) FROM "InstallmentGroup"),(SELECT count(*) FROM "Subscription"),(SELECT count(*) FROM "Alert");'
-row_counts_before="$(docker exec "$DB_CONTAINER" psql -At -U "$db_user" -d "$db_name" -c "$row_count_query")"
+
 
 echo "Copying release into permanent deployment directory"
 rsync -a \
@@ -123,9 +115,17 @@ echo "Validating Compose configuration"
 echo "Building release images before downtime"
 "${compose[@]}" build --pull backend frontend
 
+echo "Checking access configuration before downtime"
+"${compose[@]}" run --rm --no-deps backend node -e "require('./dist/middleware/auth').dashboardAuth()"
+
 echo "Stopping web services for schema cutover"
 "${compose[@]}" stop frontend backend
 web_stopped=1
+
+# Snapshot only after writers stop: backup and row counts describe the same cutover.
+backup="$(DB_CONTAINER="$DB_CONTAINER" BACKUP_DIR="$DEPLOY_DIR/backups" bash "$SOURCE_DIR/deploy/backup.sh")"
+backup_verified=1
+row_counts_before="$(docker exec "$DB_CONTAINER" psql -At -U "$db_user" -d "$db_name" -c "$row_count_query")"
 
 echo "Applying Prisma migrations"
 "${compose[@]}" run --rm --no-deps backend pnpm exec prisma migrate deploy

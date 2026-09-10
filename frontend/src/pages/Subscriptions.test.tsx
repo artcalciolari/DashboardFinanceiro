@@ -44,6 +44,15 @@ describe('Subscriptions', () => {
     getCategories.mockResolvedValue([mockExpenseCategory]);
   });
 
+  it('shows subscription load error and retries', async () => {
+    const user = userEvent.setup();
+    getPage.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(makeSubscriptionsPage([]));
+    renderWithProviders(<Subscriptions />);
+    await waitFor(() => expect(screen.getByText('Não foi possível carregar as assinaturas')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    await waitFor(() => expect(getPage).toHaveBeenCalledTimes(2));
+  });
+
   it('empty state and create with third party', async () => {
     const user = userEvent.setup();
     getPage.mockResolvedValue(makeSubscriptionsPage([], { activeCount: 0, monthlyTotalCents: 0, thirdPartyTotalCents: 0 }));
@@ -191,6 +200,14 @@ describe('Subscriptions', () => {
     expect(screen.getByText('Encerrar assinatura')).toBeInTheDocument();
     resolveDelete();
     await waitFor(() => expect(screen.queryByText('Encerrar assinatura')).not.toBeInTheDocument());
+  });
+
+  it('shows cached subscriptions warning when refresh fails', async () => {
+    getPage.mockResolvedValueOnce(makeSubscriptionsPage([mockSubscription])).mockRejectedValueOnce(new Error('down'));
+    const { queryClient } = renderWithProviders(<Subscriptions />);
+    await waitFor(() => expect(screen.getByText('Spotify Premium')).toBeInTheDocument());
+    await queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
+    await waitFor(() => expect(screen.getByText(/Exibindo dados salvos/)).toBeInTheDocument());
   });
 
   it('unchecks third party and toggles active', async () => {

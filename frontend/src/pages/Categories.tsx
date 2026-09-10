@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Tag } from 'lucide-react';
-import { categoriesApi } from '../services/api';
+import { categoriesApi, getApiErrorMessage } from '../services/api';
 import type { Category, CategoryType } from '../types';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -34,7 +34,7 @@ export default function Categories() {
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
 
-  const { data: categories = [], isLoading } = useQuery({
+  const { data: categories = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['categories'],
     queryFn: categoriesApi.getAll,
   });
@@ -149,6 +149,8 @@ export default function Categories() {
           ))}
           <span className="sr-only">Carregando...</span>
         </div>
+      ) : isError ? (
+        <div className="card py-10 text-center"><p className="text-sm text-ink">Não foi possível carregar as categorias</p><p className="mt-1 text-xs text-faint">{getApiErrorMessage(error)}</p><Button variant="secondary" size="sm" className="mt-3" onClick={() => refetch()}>Tentar novamente</Button></div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="card p-2">

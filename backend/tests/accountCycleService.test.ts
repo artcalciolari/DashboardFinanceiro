@@ -33,7 +33,7 @@ describe('accountCycleService', () => {
     prisma.installmentGroup.findMany.mockResolvedValue([
       {
         id: 'g1',
-        startDate: new Date(2026, 0, 5, 12),
+        startDate: new Date(2026, 7, 5, 12),
         transactions: [
           { id: 'i1', installmentNumber: 1, effectiveDate: new Date(2026, 7, 20, 12) },
           { id: 'i2', installmentNumber: null, effectiveDate: new Date(2026, 8, 20, 12) },

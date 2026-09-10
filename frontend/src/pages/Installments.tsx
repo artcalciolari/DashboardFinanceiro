@@ -1,7 +1,7 @@
 ﻿import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Calendar, Pencil } from 'lucide-react';
-import { installmentsApi, accountsApi, categoriesApi } from '../services/api';
+import { installmentsApi, accountsApi, categoriesApi, getApiErrorMessage } from '../services/api';
 import { formatCurrency, formatDate, parseCurrencyBR, installmentPreviewCents } from '../utils/formatters';
 import {
   compareOngoingInstallments,
@@ -123,13 +123,13 @@ export default function Installments() {
   const [form, setForm] = useState<FormState>(createEmptyForm);
   const [page, setPage] = useState(1);
   const selectedPeriodEnd = useMemo(
-    () => new Date(year, month, 0, 23, 59, 59, 999),
+    () => new Date(Math.min(new Date(year, month, 0, 23, 59, 59, 999).getTime(), Date.now())),
     [month, year]
   );
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['installments', page, month, year],
-    queryFn: () => installmentsApi.getPage(page, 25, selectedPeriodEnd.toISOString()),
+    queryFn: () => installmentsApi.getPage(page, 25, selectedPeriodEnd.toISOString(), false, month, year),
   });
   const groups = data?.items ?? [];
 
@@ -149,7 +149,7 @@ export default function Installments() {
     .filter((view) => view.isCancelled)
     .sort(compareCancelledInstallments);
 
-  const committedMonthly = ongoingInstallments.reduce((sum, view) => sum + view.installmentAmount, 0);
+  const committedMonthly = data?.aggregates?.committedMonthlyCents ?? ongoingInstallments.reduce((sum, view) => sum + view.installmentAmount, 0);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['installments'] });
@@ -368,6 +368,8 @@ export default function Installments() {
           ))}
           <span className="sr-only">Carregando...</span>
         </div>
+      ) : isError && !data ? (
+        <div className="card py-10 text-center"><p className="text-sm font-medium text-ink">Não foi possível carregar os parcelamentos</p><p className="mt-1 text-xs text-faint">{getApiErrorMessage(error)}</p><Button variant="secondary" size="sm" className="mt-4" onClick={() => refetch()}>Tentar novamente</Button></div>
       ) : groups.length === 0 ? (
         <div className="card">
           <EmptyState
@@ -379,6 +381,7 @@ export default function Installments() {
         </div>
       ) : (
         <div className="space-y-6">
+          {isError && data && <p className="rounded-lg bg-amber/10 px-3 py-2 text-xs text-amber">Exibindo dados salvos. Não foi possível atualizar agora.</p>}
           {ongoingInstallments.length > 0 && (
             <section className="space-y-3">
               <div className="flex items-center justify-between">

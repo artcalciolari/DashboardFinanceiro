@@ -34,6 +34,15 @@ describe('Accounts', () => {
     remove.mockReset().mockResolvedValue({});
   });
 
+  it('shows account load error and retries', async () => {
+    const user = userEvent.setup();
+    getAll.mockRejectedValueOnce(new Error('offline')).mockResolvedValue([]);
+    renderWithProviders(<Accounts />);
+    await waitFor(() => expect(screen.getByText('Não foi possível carregar as contas')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    await waitFor(() => expect(getAll).toHaveBeenCalledTimes(2));
+  });
+
   it('shows empty state and opens create modal', async () => {
     const user = userEvent.setup();
     getAll.mockResolvedValue([]);

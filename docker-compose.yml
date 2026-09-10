@@ -31,6 +31,8 @@ services:
       HOST: 0.0.0.0
       BUSINESS_TIME_ZONE: ${BUSINESS_TIME_ZONE:-America/Sao_Paulo}
       TZ: ${BUSINESS_TIME_ZONE:-America/Sao_Paulo}
+      DASHBOARD_AUTH_USER: ${DASHBOARD_AUTH_USER:?DASHBOARD_AUTH_USER is required}
+      DASHBOARD_AUTH_PASSWORD: ${DASHBOARD_AUTH_PASSWORD:?DASHBOARD_AUTH_PASSWORD is required}
     expose:
       - "3001"
     depends_on:

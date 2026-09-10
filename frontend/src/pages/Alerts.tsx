@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Bell, BellOff } from 'lucide-react';
-import { alertsApi, categoriesApi } from '../services/api';
+import { alertsApi, categoriesApi, getApiErrorMessage } from '../services/api';
 import { centsToInput, formatCurrency, parseCurrencyBR } from '../utils/formatters';
 import type { Alert, AlertPeriod } from '../types';
 import Modal from '../components/ui/Modal';
@@ -37,7 +37,7 @@ export default function Alerts() {
   const [deleteTarget, setDeleteTarget] = useState<Alert | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
 
-  const { data: alerts = [], isLoading } = useQuery({
+  const { data: alerts = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['alerts'],
     queryFn: alertsApi.getAll,
   });
@@ -157,12 +157,15 @@ export default function Alerts() {
           ))}
           <span className="sr-only">Carregando...</span>
         </div>
+      ) : isError && alerts.length === 0 ? (
+        <div className="card max-w-[720px] py-10 text-center"><p className="text-sm text-ink">Não foi possível carregar os alertas</p><p className="mt-1 text-xs text-faint">{getApiErrorMessage(error)}</p><Button variant="secondary" size="sm" className="mt-3" onClick={() => refetch()}>Tentar novamente</Button></div>
       ) : alerts.length === 0 ? (
         <div className="card max-w-[720px]">
           <EmptyState icon={Bell} title="Nenhum alerta configurado" actionLabel="Criar alerta" onAction={openCreate} />
         </div>
       ) : (
         <div className="flex max-w-[720px] flex-col gap-3">
+          {isError && <p className="rounded-lg bg-amber/10 px-3 py-2 text-xs text-amber">Exibindo dados salvos. Não foi possível atualizar agora.</p>}
           {sortedAlerts.map((alert) => {
             const status = statusMap[alert.id];
             const pct = status ? Math.min(status.percentage, 100) : 0;

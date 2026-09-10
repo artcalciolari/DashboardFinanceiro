@@ -79,6 +79,10 @@ model Transaction {
   thirdPartyName String?
   isReimbursed   Boolean @default(false)
 
+  paidAt                DateTime?
+  reimbursedAmountCents Int       @default(0)
+  reimbursedAt          DateTime?
+
   notes String?
 
   createdAt DateTime @default(now())
@@ -86,6 +90,7 @@ model Transaction {
 
   @@unique([subscriptionId, subscriptionYear, subscriptionMonth])
   @@index([effectiveDate, id])
+  @@index([paidAt])
   @@index([accountId, effectiveDate])
   @@index([categoryId, effectiveDate])
   @@index([installmentGroupId, installmentNumber])

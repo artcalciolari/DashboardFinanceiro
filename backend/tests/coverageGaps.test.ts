@@ -1,4 +1,4 @@
-﻿import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { createPrismaMock } from './helpers/prismaMock';
 
@@ -9,6 +9,7 @@ vi.mock('../src/services/subscriptionService', () => ({
   ensureSubscriptionTransactions: vi.fn().mockResolvedValue(undefined),
   getSubscriptionHorizon: vi.fn(() => new Date(2027, 7, 31, 23, 59, 59)),
   resetSubscriptionTransactionHorizon: vi.fn(),
+  synchronizeSubscriptionTransactions: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../src/services/accountCycleService', () => ({
   recalculateAccountEffectiveDates: vi.fn().mockResolvedValue(undefined),
@@ -17,6 +18,7 @@ vi.mock('../src/services/accountCycleService', () => ({
 describe('controller catch paths and remaining branches', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prisma.$transaction.mockImplementation(async (arg: any) => typeof arg === 'function' ? arg(prisma) : Promise.all(arg));
   });
 
   it('forwards prisma failures through next/errorHandler for CRUD controllers', async () => {

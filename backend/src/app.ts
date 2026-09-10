@@ -7,6 +7,7 @@ import { router } from './routes';
 import { errorHandler } from './middleware/errorHandler';
 import { HttpError } from './utils/httpError';
 import prisma from './lib/prisma';
+import { dashboardAuth } from './middleware/auth';
 
 const defaultOrigins = [
   'http://localhost:5173',
@@ -29,7 +30,7 @@ export function createApp() {
     .filter(Boolean);
 
   app.use(helmet());
-  app.use(pinoHttp({ enabled: process.env.NODE_ENV !== 'test' }));
+  app.use(pinoHttp({ enabled: process.env.NODE_ENV !== 'test', redact: ['req.headers.authorization', 'req.headers.cookie'] }));
   app.use((req, res, next) => {
     cors({
       origin(origin, callback) {
@@ -56,7 +57,7 @@ export function createApp() {
     }
   });
   app.get('/health', (_req, res) => res.redirect(307, '/health/live'));
-  app.use('/api', router);
+  app.use('/api', dashboardAuth(), router);
   app.use(errorHandler);
 
   return app;

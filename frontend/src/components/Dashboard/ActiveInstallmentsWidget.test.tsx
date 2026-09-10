@@ -1,5 +1,5 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import ActiveInstallmentsWidget from './ActiveInstallmentsWidget';
 import { renderWithProviders } from '@/test/test-utils';
 import { makeInstallmentsPage, mockInstallmentGroup } from '@/test/fixtures';
@@ -7,6 +7,7 @@ import { makeInstallmentsPage, mockInstallmentGroup } from '@/test/fixtures';
 const getPage = vi.fn();
 
 vi.mock('@/services/api', () => ({
+  getApiErrorMessage: () => 'offline',
   installmentsApi: {
     getPage: (...a: unknown[]) => getPage(...a),
   },
@@ -79,4 +80,29 @@ describe('ActiveInstallmentsWidget', () => {
     const bar = document.querySelector('.bg-income');
     expect(bar).toBeTruthy();
   });
+
+  it('falls back to item totals when aggregate totals are absent', async () => {
+    const page = makeInstallmentsPage([mockInstallmentGroup]);
+    getPage.mockResolvedValue({ ...page, aggregates: {} });
+    renderWithProviders(<ActiveInstallmentsWidget />);
+    await waitFor(() => expect(screen.getByText(/restam/)).toHaveTextContent('R$ 2.100,00'));
+    expect(screen.getByText(/1 parcelamento/)).toBeInTheDocument();
+  });
+
+  it('retries after a query error', async () => {
+    getPage.mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce(makeInstallmentsPage([mockInstallmentGroup]));
+    renderWithProviders(<ActiveInstallmentsWidget />);
+    await waitFor(() => expect(screen.getByText('Não foi possível carregar os parcelamentos')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    await waitFor(() => expect(screen.getByText('Notebook')).toBeInTheDocument());
+  });
+
+  it('warns when cached installments cannot refresh', async () => {
+    getPage.mockResolvedValueOnce(makeInstallmentsPage([mockInstallmentGroup])).mockRejectedValueOnce(new Error('down'));
+    const { queryClient } = renderWithProviders(<ActiveInstallmentsWidget />, { initialMonth: 1, initialYear: 2024 });
+    await waitFor(() => expect(screen.getByText('Notebook')).toBeInTheDocument());
+    await queryClient.invalidateQueries({ queryKey: ['installments', 'dashboard', 1, 2024] });
+    await waitFor(() => expect(screen.getByText(/Exibindo dados salvos/)).toBeInTheDocument());
+  });
+
 });

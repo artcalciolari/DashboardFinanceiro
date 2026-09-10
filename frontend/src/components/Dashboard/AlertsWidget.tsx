@@ -1,12 +1,13 @@
 ﻿import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
-import { alertsApi } from '../../services/api';
+import { alertsApi, getApiErrorMessage } from '../../services/api';
 import { formatCurrency } from '../../utils/formatters';
 import { clsx } from 'clsx';
 import Skeleton from '../ui/Skeleton';
+import Button from '../ui/Button';
 
 export default function AlertsWidget() {
-  const { data = [], isLoading } = useQuery({
+  const { data = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['alerts', 'check'],
     queryFn: alertsApi.check,
     refetchInterval: 1000 * 60 * 5, // Atualiza a cada 5 minutos
@@ -30,12 +31,15 @@ export default function AlertsWidget() {
           <Skeleton className="h-[64px] w-full" />
           <span className="sr-only">Carregando...</span>
         </div>
+      ) : isError && data.length === 0 ? (
+        <div className="py-8 text-center"><p className="text-sm text-ink">Não foi possível carregar os alertas</p><p className="mt-1 text-xs text-faint">{getApiErrorMessage(error)}</p><Button variant="secondary" size="sm" className="mt-3" onClick={() => refetch()}>Tentar novamente</Button></div>
       ) : data.length === 0 ? (
         <div className="py-8 text-center text-sm text-faint">Nenhum alerta configurado</div>
       ) : active.length === 0 ? (
         <div className="py-8 text-center text-sm text-faint">Nenhum alerta próximo do limite</div>
       ) : (
         <div className="flex flex-col gap-3">
+          {isError && <p className="rounded-lg bg-amber/10 px-3 py-2 text-xs text-amber">Exibindo dados salvos. Não foi possível atualizar agora.</p>}
           {active.map((alert) => {
             const pct = Math.min(alert.percentage, 100);
             return (

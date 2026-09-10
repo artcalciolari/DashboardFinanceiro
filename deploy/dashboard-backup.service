@@ -1,0 +1,11 @@
+[Unit]
+Description=Dashboard financeiro backup with restore verification
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=arthur
+EnvironmentFile=/home/arthur/dashboard-financeiro/.env
+ExecStart=/usr/bin/bash /home/arthur/dashboard-financeiro/deploy/backup.sh
+UMask=0077

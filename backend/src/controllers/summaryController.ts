@@ -30,7 +30,7 @@ function emptyTotals(): Totals {
 }
 
 function addTransaction(totals: Totals, transaction: {
-  type: 'INCOME' | 'EXPENSE'; amountCents: number; isThirdParty: boolean; isReimbursed: boolean;
+  type: 'INCOME' | 'EXPENSE'; amountCents: number; isThirdParty: boolean; isReimbursed: boolean; reimbursedAmountCents?: number;
 }) {
   if (transaction.type === 'INCOME') {
     totals.incomeCents += transaction.amountCents;
@@ -39,7 +39,7 @@ function addTransaction(totals: Totals, transaction: {
   totals.invoiceExpensesCents += transaction.amountCents;
   if (transaction.isThirdParty) {
     totals.thirdPartyExpensesCents += transaction.amountCents;
-    if (!transaction.isReimbursed) totals.receivableCents += transaction.amountCents;
+    totals.receivableCents += transaction.amountCents - (transaction.reimbursedAmountCents ?? (transaction.isReimbursed ? transaction.amountCents : 0));
   }
 }
 
@@ -54,7 +54,7 @@ export async function getMonthlySummary(req: Request, res: Response, next: NextF
     await ensureSubscriptionTransactions(endDate);
     const transactions = await prisma.transaction.findMany({
       where: { effectiveDate: { gte: startDate, lte: endDate } },
-      select: { type: true, amountCents: true, isThirdParty: true, isReimbursed: true },
+      select: { type: true, amountCents: true, isThirdParty: true, isReimbursed: true, reimbursedAmountCents: true },
     });
     const totals = emptyTotals();
     for (const transaction of transactions) addTransaction(totals, transaction);
@@ -111,7 +111,7 @@ export async function getMonthlyEvolution(req: Request, res: Response, next: Nex
     await ensureSubscriptionTransactions(endDate);
     const transactions = await prisma.transaction.findMany({
       where: { effectiveDate: { gte: startDate, lte: endDate } },
-      select: { effectiveDate: true, type: true, amountCents: true, isThirdParty: true, isReimbursed: true },
+      select: { effectiveDate: true, type: true, amountCents: true, isThirdParty: true, isReimbursed: true, reimbursedAmountCents: true },
     });
     const totalsByPeriod = new Map(periods.map((period) => [`${period.year}-${period.month}`, period.totals]));
     for (const transaction of transactions) {
@@ -139,7 +139,7 @@ export async function getAccountSummary(req: Request, res: Response, next: NextF
       prisma.account.findMany(),
       prisma.transaction.findMany({
         where: { effectiveDate: { gte: startDate, lte: endDate } },
-        select: { accountId: true, type: true, amountCents: true, isThirdParty: true, isReimbursed: true },
+        select: { accountId: true, type: true, amountCents: true, isThirdParty: true, isReimbursed: true, reimbursedAmountCents: true },
       }),
     ]);
     const totalsByAccount = new Map(accounts.map((account) => [account.id, emptyTotals()]));

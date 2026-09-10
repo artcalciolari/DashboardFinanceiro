@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { financialTransaction } from '../services/financialTransaction';
 import { z } from 'zod';
 import { Prisma, type Account, type Category, type Transaction } from '@prisma/client';
 import prisma from '../lib/prisma';
@@ -178,6 +179,8 @@ export async function createTransaction(req: Request, res: Response, next: NextF
           data.isReimbursed
         ),
         notes: data.notes,
+        reimbursedAmountCents: data.type === 'EXPENSE' && data.isThirdParty && data.isReimbursed ? data.amountCents : 0,
+        reimbursedAt: data.type === 'EXPENSE' && data.isThirdParty && data.isReimbursed ? new Date() : null,
       },
       include: { account: true, category: true, subscription: true },
     });
@@ -190,6 +193,7 @@ export async function createTransaction(req: Request, res: Response, next: NextF
 
 export async function updateTransaction(req: Request, res: Response, next: NextFunction) {
   try {
+    const result = await financialTransaction(async (tx) => {
     await ensureTransactionIsManual(req.params.id);
     const data = TransactionSchema.partial().parse(req.body);
 
@@ -201,16 +205,25 @@ export async function updateTransaction(req: Request, res: Response, next: NextF
       data.thirdPartyName !== undefined ||
       data.isReimbursed !== undefined;
 
-    if (data.date || data.accountId || data.categoryId || data.type || touchesThirdParty) {
-      existing = await prisma.transaction.findUniqueOrThrow({
+    if (data.date || data.accountId || data.categoryId || data.type || data.amountCents || touchesThirdParty) {
+      existing = await tx.transaction.findUniqueOrThrow({
         where: { id: req.params.id },
         include: { account: true, category: true },
       });
     }
 
+    if (existing && (existing.reimbursedAmountCents > 0 || existing.paidAt) && (
+      (data.amountCents !== undefined && data.amountCents !== existing.amountCents) ||
+      (data.type !== undefined && data.type !== existing.type) ||
+      (data.accountId !== undefined && data.accountId !== existing.accountId) ||
+      (data.isThirdParty !== undefined && data.isThirdParty !== existing.isThirdParty)
+    )) {
+      throw new HttpError(409, 'Estorne a baixa antes de alterar os dados financeiros', 'SETTLED_TRANSACTION');
+    }
+
     if (data.date || data.accountId) {
       const account = data.accountId
-        ? await prisma.account.findUniqueOrThrow({ where: { id: data.accountId } })
+        ? await tx.account.findUniqueOrThrow({ where: { id: data.accountId } })
         : existing!.account;
       effectiveDate = calculateEffectiveDate(
         data.date ? new Date(data.date) : existing!.date,
@@ -232,7 +245,7 @@ export async function updateTransaction(req: Request, res: Response, next: NextF
       }
     }
 
-    const transaction = await prisma.transaction.update({
+    const transaction = await tx.transaction.update({
       where: { id: req.params.id },
       data: {
         ...data,
@@ -246,11 +259,19 @@ export async function updateTransaction(req: Request, res: Response, next: NextF
               data.isReimbursed ?? existing.isReimbursed
             )
           : {}),
+        ...(data.isReimbursed !== undefined && existing && data.isReimbursed !== existing.isReimbursed
+          ? {
+              reimbursedAmountCents: data.isReimbursed && (data.isThirdParty ?? existing.isThirdParty) ? data.amountCents ?? existing.amountCents : 0,
+              reimbursedAt: data.isReimbursed && (data.isThirdParty ?? existing.isThirdParty) ? new Date() : null,
+            }
+          : {}),
       },
       include: { account: true, category: true, subscription: true },
     });
 
-    res.json(transaction);
+    return transaction;
+    });
+    res.json(result);
   } catch (err) {
     next(err);
   }

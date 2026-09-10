@@ -6,11 +6,13 @@ import {
   ensureSubscriptionTransactions,
   getSubscriptionHorizon,
   resetSubscriptionTransactionHorizon,
+  synchronizeSubscriptionTransactions,
 } from '../services/subscriptionService';
 import { HttpError } from '../utils/httpError';
 import { PositiveMoneyCents } from '../utils/money';
 import { parsePageQuery } from '../utils/pagination';
 import { futureCutoff } from '../utils/businessTime';
+import { financialTransaction } from '../services/financialTransaction';
 
 const DateString = z.string().refine((value) => !Number.isNaN(new Date(value).getTime()), {
   message: 'Data inválida',
@@ -172,13 +174,16 @@ export async function createSubscription(req: Request, res: Response, next: Next
     const data = normalizeSubscriptionData(SubscriptionSchema.parse(req.body));
     await ensureExpenseCategory(data.categoryId);
 
-    const subscription = await prisma.subscription.create({
+    const subscription = await financialTransaction(async (tx) => {
+    const subscription = await tx.subscription.create({
       data,
       include: { account: true, category: true },
     });
+    await synchronizeSubscriptionTransactions(getSubscriptionHorizon(), tx, undefined, subscription.id);
+    return subscription;
+    });
 
     resetSubscriptionTransactionHorizon();
-    await ensureSubscriptionTransactions(getSubscriptionHorizon());
     res.status(201).json(subscription);
   } catch (err) {
     next(err);
@@ -188,7 +193,8 @@ export async function createSubscription(req: Request, res: Response, next: Next
 export async function updateSubscription(req: Request, res: Response, next: NextFunction) {
   try {
     const patch = SubscriptionFields.partial().parse(req.body);
-    const existing = await prisma.subscription.findUniqueOrThrow({ where: { id: req.params.id } });
+    const subscription = await financialTransaction(async (tx) => {
+    const existing = await tx.subscription.findUniqueOrThrow({ where: { id: req.params.id } });
     const merged = SubscriptionSchema.parse({
       name: existing.name,
       amountCents: existing.amountCents,
@@ -207,19 +213,19 @@ export async function updateSubscription(req: Request, res: Response, next: Next
     const data = normalizeSubscriptionData(merged);
     await ensureExpenseCategory(data.categoryId);
 
-    const [subscription] = await prisma.$transaction([
-      prisma.subscription.update({
+    const subscription = await tx.subscription.update({
         where: { id: req.params.id },
         data,
         include: { account: true, category: true },
-      }),
-      prisma.transaction.deleteMany({
-        where: { subscriptionId: req.params.id, effectiveDate: { gte: futureCutoff() } },
-      }),
-    ]);
+      });
+      await tx.transaction.deleteMany({
+        where: { subscriptionId: req.params.id, effectiveDate: { gte: futureCutoff() }, paidAt: null, reimbursedAmountCents: 0 },
+      });
+      await synchronizeSubscriptionTransactions(getSubscriptionHorizon(), tx, undefined, subscription.id);
+      return subscription;
+    });
 
     resetSubscriptionTransactionHorizon();
-    await ensureSubscriptionTransactions(getSubscriptionHorizon());
     res.json(subscription);
   } catch (err) {
     next(err);
@@ -230,11 +236,11 @@ export async function deleteSubscription(req: Request, res: Response, next: Next
   try {
     const mode = req.query.mode === 'all' ? 'all' : 'future';
 
-    await prisma.$transaction(async (tx) => {
+    await financialTransaction(async (tx) => {
       await tx.transaction.deleteMany({
         where: {
           subscriptionId: req.params.id,
-          ...(mode === 'future' ? { effectiveDate: { gte: futureCutoff() } } : {}),
+          ...(mode === 'future' ? { effectiveDate: { gte: futureCutoff() }, paidAt: null, reimbursedAmountCents: 0 } : {}),
         },
       });
       await tx.transaction.updateMany({

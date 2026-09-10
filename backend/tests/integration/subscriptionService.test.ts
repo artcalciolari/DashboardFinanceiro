@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import { addDays, addMonths, startOfMonth } from 'date-fns';
 import request from 'supertest';
@@ -159,5 +159,78 @@ integrationSuite('subscription materialization', () => {
     expect(allResponse.status).toBe(204);
     expect(await prisma.installmentGroup.findUnique({ where: { id: removableGroup.id } })).toBeNull();
     expect(await prisma.transaction.count({ where: { installmentGroupId: removableGroup.id } })).toBe(0);
+  });
+
+  it('rolls back the account and every recalculation when a database write fails', async () => {
+    const account = await prisma.account.create({ data: { name: 'Rollback card', type: 'CREDIT_CARD', closingDay: 10, dueDay: 20 } });
+    const date = addDays(new Date(), 2);
+    await prisma.transaction.create({ data: { id: 'rollback-occurrence', description: 'Rollback', amountCents: 100, type: 'EXPENSE', accountId: account.id, categoryId, date, effectiveDate: date } });
+    await prisma.$executeRawUnsafe(`CREATE FUNCTION test_reject_recalculation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.id = 'rollback-occurrence' THEN RAISE EXCEPTION 'Injected recalculation failure'; END IF; RETURN NEW; END $$`);
+    await prisma.$executeRawUnsafe(`CREATE TRIGGER test_reject_recalculation BEFORE UPDATE OF "effectiveDate" ON "Transaction" FOR EACH ROW EXECUTE FUNCTION test_reject_recalculation()`);
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      expect((await request(createApp()).patch(`/api/accounts/${account.id}`).send({ dueDay: 25 })).status).toBe(500);
+      expect(consoleSpy.mock.calls.some(([error]) => String(error).includes('Injected recalculation failure'))).toBe(true);
+      expect((await prisma.account.findUniqueOrThrow({ where: { id: account.id } })).dueDay).toBe(20);
+      expect((await prisma.transaction.findUniqueOrThrow({ where: { id: 'rollback-occurrence' } })).effectiveDate).toEqual(date);
+    } finally {
+      consoleSpy.mockRestore();
+      await prisma.$executeRawUnsafe('DROP TRIGGER test_reject_recalculation ON "Transaction"');
+      await prisma.$executeRawUnsafe('DROP FUNCTION test_reject_recalculation()');
+    }
+  });
+
+  it('blocks category type changes through the API and directly in PostgreSQL', async () => {
+    const response = await request(createApp()).patch(`/api/categories/${categoryId}`).send({ type: 'INCOME' });
+    expect(response.status).toBe(409);
+    await expect(prisma.category.update({ where: { id: categoryId }, data: { type: 'INCOME' } })).rejects.toThrow();
+    const income = await prisma.category.create({ data: { name: 'Income integrity', type: 'INCOME' } });
+    await expect(prisma.transaction.create({ data: { description: 'Invalid', type: 'EXPENSE', amountCents: 100, date: new Date(), effectiveDate: new Date(), accountId, categoryId: income.id } })).rejects.toThrow();
+  });
+
+  it('preserves payment and partial reimbursement when editing and cancelling a subscription', async () => {
+    const app = createApp();
+    const bank = await prisma.account.create({ data: { name: 'Settlements bank', type: 'BANK_ACCOUNT' } });
+    const startDate = new Date().toISOString();
+    const created = await request(app).post('/api/subscriptions').send({ name: 'Shared charge', amountCents: 1000, startDate, accountId: bank.id, categoryId, isThirdParty: true });
+    expect(created.status).toBe(201);
+    const occurrence = await prisma.transaction.findFirstOrThrow({ where: { subscriptionId: created.body.id }, orderBy: { effectiveDate: 'asc' } });
+    const paidAt = new Date().toISOString();
+    expect((await request(app).patch(`/api/transactions/${occurrence.id}/settlement`).send({ paidAt })).status).toBe(200);
+    expect((await request(app).patch(`/api/transactions/${occurrence.id}/reimbursement`).send({ reimbursedAmountCents: 400, reimbursedAt: paidAt })).status).toBe(200);
+    expect((await request(app).patch(`/api/subscriptions/${created.body.id}`).send({ amountCents: 2000 })).status).toBe(200);
+    const afterEdit = await prisma.transaction.findUniqueOrThrow({ where: { id: occurrence.id } });
+    expect(afterEdit).toMatchObject({ amountCents: 1000, reimbursedAmountCents: 400, paidAt: new Date(paidAt) });
+    const summary = await request(app).get('/api/summary/accounts').query({ month: occurrence.effectiveDate.getMonth() + 1, year: occurrence.effectiveDate.getFullYear() });
+    expect(summary.body.find((item: { account: { id: string } }) => item.account.id === bank.id).receivableCents).toBe(600);
+    expect((await request(app).delete(`/api/subscriptions/${created.body.id}`).query({ mode: 'future' })).status).toBe(204);
+    expect((await prisma.transaction.findUniqueOrThrow({ where: { id: occurrence.id } })).reimbursedAmountCents).toBe(400);
+  });
+
+  it('materializes uniquely across independent PostgreSQL connections', async () => {
+    const { PrismaClient } = await import('@prisma/client');
+    const { synchronizeSubscriptionTransactions } = await import('../../src/services/subscriptionService');
+    const other = new PrismaClient();
+    const subscription = await prisma.subscription.create({ data: { name: 'Independent workers', amountCents: 100, startDate: new Date(2026, 0, 1, 12), billingDay: 1, accountId, categoryId } });
+    try {
+      const until = new Date(2026, 2, 31);
+      await Promise.all([prisma, other].map((client) => client.$transaction((tx) => synchronizeSubscriptionTransactions(until, tx, undefined, subscription.id))));
+      expect(await prisma.transaction.count({ where: { subscriptionId: subscription.id } })).toBe(3);
+    } finally { await other.$disconnect(); }
+  });
+
+  it('keeps category invariants when a type change races a new expense', async () => {
+    const { PrismaClient } = await import('@prisma/client');
+    const other = new PrismaClient();
+    const category = await prisma.category.create({ data: { name: 'Concurrent category', type: 'EXPENSE' } });
+    try {
+      const outcomes = await Promise.allSettled([
+        prisma.category.update({ where: { id: category.id }, data: { type: 'INCOME' } }),
+        other.transaction.create({ data: { description: 'Concurrent expense', type: 'EXPENSE', amountCents: 100, date: new Date(), effectiveDate: new Date(), accountId, categoryId: category.id } }),
+      ]);
+      expect(outcomes.filter((result) => result.status === 'rejected')).toHaveLength(1);
+      const rows = await prisma.transaction.findMany({ where: { categoryId: category.id }, include: { category: true } });
+      expect(rows.every((row) => row.type === row.category.type)).toBe(true);
+    } finally { await other.$disconnect(); }
   });
 });

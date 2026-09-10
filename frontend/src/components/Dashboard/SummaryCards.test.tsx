@@ -1,7 +1,7 @@
 ﻿import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import SummaryCards from './SummaryCards';
-import { renderWithProviders } from '@/test/test-utils';
+import { createTestQueryClient, renderWithProviders } from '@/test/test-utils';
 import { mockEvolution, mockMonthlySummary } from '@/test/fixtures';
 
 const getMonthly = vi.fn();
@@ -9,6 +9,7 @@ const getEvolution = vi.fn();
 const getPage = vi.fn();
 
 vi.mock('@/services/api', () => ({
+  getApiErrorMessage: () => 'offline',
   summaryApi: {
     getMonthly: (...a: unknown[]) => getMonthly(...a),
     getEvolution: (...a: unknown[]) => getEvolution(...a),
@@ -117,5 +118,41 @@ describe('SummaryCards', () => {
     await waitFor(() => expect(screen.getByText('0 entradas no mês')).toBeInTheDocument());
     // balance/income/expense fall back to 0 when monthly query failed
     expect(screen.getAllByText(/R\$/).length).toBeGreaterThan(0);
+  });
+
+  it('formats zero balance when balance is absent from a successful response', async () => {
+    getMonthly.mockResolvedValue({ ...mockMonthlySummary, balanceCents: undefined });
+    getEvolution.mockResolvedValue([]);
+    getPage.mockResolvedValue({ items: [], nextCursor: null, totalCount: 0, totals: { incomeCents: 0, expenseCents: 0 } });
+    renderWithProviders(<SummaryCards />, { initialMonth: 6, initialYear: 2024 });
+    await waitFor(() => expect(screen.getAllByText('R$ 0,00').length).toBeGreaterThan(0));
+  });
+
+  it('retries after a monthly query error', async () => {
+    getMonthly.mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce(mockMonthlySummary);
+    getEvolution.mockResolvedValue([]);
+    getPage.mockResolvedValue({ items: [], nextCursor: null, totalCount: 0, totals: { incomeCents: 0, expenseCents: 0 } });
+    renderWithProviders(<SummaryCards />, { initialMonth: 6, initialYear: 2024 });
+    await waitFor(() => expect(screen.getByText('offline')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    await waitFor(() => expect(screen.queryByText('—')).not.toBeInTheDocument());
+  });
+
+  it('warns when cached monthly data cannot refresh', async () => {
+    getMonthly.mockRejectedValue(new Error('down'));
+    getEvolution.mockResolvedValue([]);
+    getPage.mockResolvedValue({ items: [], nextCursor: null, totalCount: 0, totals: { incomeCents: 0, expenseCents: 0 } });
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(['summary', 'monthly', 6, 2024], mockMonthlySummary);
+    renderWithProviders(<SummaryCards />, { queryClient, initialMonth: 6, initialYear: 2024 });
+    await waitFor(() => expect(screen.getByText('offline')).toBeInTheDocument());
+  });
+
+  it('shows unavailable income count when income query fails', async () => {
+    getMonthly.mockResolvedValue(mockMonthlySummary);
+    getEvolution.mockResolvedValue([]);
+    getPage.mockRejectedValue(new Error('income count failed'));
+    renderWithProviders(<SummaryCards />, { initialMonth: 6, initialYear: 2024 });
+    await waitFor(() => expect(screen.getByText('Contagem indisponível')).toBeInTheDocument());
   });
 });

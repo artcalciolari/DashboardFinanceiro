@@ -2,13 +2,14 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import {
-  ensureSubscriptionTransactions,
   getSubscriptionHorizon,
   resetSubscriptionTransactionHorizon,
+  synchronizeSubscriptionTransactions,
 } from '../services/subscriptionService';
 import { MoneyCents, PositiveMoneyCents } from '../utils/money';
 import { mutablePeriodStart } from '../utils/businessTime';
 import { recalculateAccountEffectiveDates } from '../services/accountCycleService';
+import { financialTransaction } from '../services/financialTransaction';
 
 const AccountSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -63,9 +64,10 @@ export async function createAccount(req: Request, res: Response, next: NextFunct
 export async function updateAccount(req: Request, res: Response, next: NextFunction) {
   try {
     const data = AccountSchema.partial().parse(req.body);
-    const existing = await prisma.account.findUniqueOrThrow({ where: { id: req.params.id } });
+    const account = await financialTransaction(async (tx) => {
+    const existing = await tx.account.findUniqueOrThrow({ where: { id: req.params.id } });
     const accountType = data.type ?? existing.type;
-    const account = await prisma.account.update({
+    const account = await tx.account.update({
       where: { id: req.params.id },
       data: normalizeAccountData(data, accountType),
     });
@@ -77,11 +79,12 @@ export async function updateAccount(req: Request, res: Response, next: NextFunct
       account.closingDay !== existing.closingDay ||
       account.dueDay !== existing.dueDay
     ) {
-      await recalculateAccountEffectiveDates(account.id, mutablePeriodStart());
-      resetSubscriptionTransactionHorizon();
-      await ensureSubscriptionTransactions(getSubscriptionHorizon());
+      await recalculateAccountEffectiveDates(account.id, mutablePeriodStart(), tx);
+      await synchronizeSubscriptionTransactions(getSubscriptionHorizon(), tx, account.id);
     }
-
+    return account;
+    });
+    resetSubscriptionTransactionHorizon();
     res.json(account);
   } catch (err) {
     next(err);

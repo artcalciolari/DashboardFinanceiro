@@ -1,7 +1,7 @@
 ﻿import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
-import { subscriptionsApi, accountsApi, categoriesApi } from '../services/api';
+import { subscriptionsApi, accountsApi, categoriesApi, getApiErrorMessage } from '../services/api';
 import { useDate } from '../context/DateContext';
 import { centsToInput, formatCurrency, formatDate, parseCurrencyBR } from '../utils/formatters';
 import type { Subscription } from '../types';
@@ -88,7 +88,7 @@ export default function Subscriptions() {
   const [page, setPage] = useState(1);
   const period = useMemo(() => getPeriodRange(month, year), [month, year]);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['subscriptions', page, month, year],
     queryFn: () => subscriptionsApi.getPage(page, 25, period.end.toISOString()),
   });
@@ -226,6 +226,8 @@ export default function Subscriptions() {
           ))}
           <span className="sr-only">Carregando...</span>
         </div>
+      ) : isError && !data ? (
+        <div className="card py-10 text-center"><p className="text-sm text-ink">Não foi possível carregar as assinaturas</p><p className="mt-1 text-xs text-faint">{getApiErrorMessage(error)}</p><Button variant="secondary" size="sm" className="mt-3" onClick={() => refetch()}>Tentar novamente</Button></div>
       ) : subscriptions.length === 0 ? (
         <div className="card">
           <EmptyState
@@ -237,6 +239,7 @@ export default function Subscriptions() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-card border border-border bg-card">
+          {isError && <p className="m-3 rounded-lg bg-amber/10 px-3 py-2 text-xs text-amber">Exibindo dados salvos. Não foi possível atualizar agora.</p>}
           {sortedSubscriptions.map((subscription) => {
             const nextTransaction = subscription.nextTransaction ?? null;
 

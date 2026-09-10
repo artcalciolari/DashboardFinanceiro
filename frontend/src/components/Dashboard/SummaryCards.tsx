@@ -1,26 +1,27 @@
 ﻿import { TrendingUp, TrendingDown } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { summaryApi, transactionsApi } from '../../services/api';
+import { summaryApi, transactionsApi, getApiErrorMessage } from '../../services/api';
 import { useDate } from '../../context/DateContext';
 import { formatCurrency, capitalize, sparkChartRange, sparkChartX, formatSummaryAmount } from '../../utils/formatters';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { clsx } from 'clsx';
+import Button from '../ui/Button';
 
 export default function SummaryCards() {
   const { month, year } = useDate();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['summary', 'monthly', month, year],
     queryFn: () => summaryApi.getMonthly(month, year),
   });
 
-  const { data: evolution = [] } = useQuery({
+  const { data: evolution = [], isError: evolutionError } = useQuery({
     queryKey: ['summary', 'evolution'],
     queryFn: summaryApi.getEvolution,
   });
 
-  const { data: incomePage } = useQuery({
+  const { data: incomePage, isError: incomeError } = useQuery({
     queryKey: ['transactions', 'income-count', month, year],
     queryFn: () => transactionsApi.getPage({ month, year, type: 'INCOME' }, null, 1),
   });
@@ -36,9 +37,9 @@ export default function SummaryCards() {
   });
   const currentIdx = sortedEvolution.findIndex((m) => m.month === month && m.year === year);
   const previous = currentIdx > 0 ? sortedEvolution[currentIdx - 1] : undefined;
-  const currentBalance = data?.balanceCents ?? 0;
+  const currentBalance = data?.balanceCents;
   const previousBalance = previous ? previous.incomeCents - previous.expensesCents : undefined;
-  const balanceDiff = previousBalance !== undefined ? currentBalance - previousBalance : undefined;
+  const balanceDiff = currentBalance !== undefined && previousBalance !== undefined ? currentBalance - previousBalance : undefined;
   const pctChange =
     previousBalance !== undefined && previousBalance !== 0
       ? Math.round((balanceDiff! / Math.abs(previousBalance)) * 100)
@@ -92,7 +93,7 @@ export default function SummaryCards() {
         </div>
         <div className="relative">
           <div className="tabular my-3.5 font-display text-display-xl leading-none tracking-tight">
-            {isLoading ? '—' : formatCurrency(currentBalance)}
+            {isLoading || isError ? '—' : formatCurrency(currentBalance ?? 0)}
           </div>
           {balanceDiff !== undefined && previousLabel && (
             <div className="text-[13px] text-[#A3C0D2]">
@@ -128,10 +129,10 @@ export default function SummaryCards() {
         </div>
         <div>
           <div className="tabular mt-4 whitespace-nowrap font-display text-display-md tracking-tight text-income">
-            {formatSummaryAmount(isLoading, data?.totalIncomeCents)}
+            {isError ? '—' : formatSummaryAmount(isLoading, data?.totalIncomeCents)}
           </div>
           <div className="mt-0.5 text-[12px] text-faint">
-            {incomeCount} entrada{incomeCount === 1 ? '' : 's'} no mês
+            {incomeError ? 'Contagem indisponível' : `${incomeCount} entrada${incomeCount === 1 ? '' : 's'} no mês`}
           </div>
         </div>
       </div>
@@ -146,13 +147,18 @@ export default function SummaryCards() {
         </div>
         <div>
           <div className="tabular mt-4 whitespace-nowrap font-display text-display-md tracking-tight text-expense">
-            {formatSummaryAmount(isLoading, data?.totalExpensesCents)}
+            {isError ? '—' : formatSummaryAmount(isLoading, data?.totalExpensesCents)}
           </div>
           <div className="mt-0.5 text-[12px] text-faint">
-            Fatura total: {formatCurrency(data?.invoiceExpensesCents ?? 0)}
+            {isError ? 'Dados indisponíveis' : `Fatura total: ${formatCurrency(data?.invoiceExpensesCents ?? 0)}`}
           </div>
         </div>
       </div>
+      {(isError || evolutionError || incomeError) && (
+        <div className="col-span-full flex items-center justify-between gap-3 rounded-lg bg-expense/5 px-3 py-2 text-xs text-expense">
+          <span>{getApiErrorMessage(error)}</span><Button variant="secondary" size="sm" onClick={() => refetch()}>Tentar novamente</Button>
+        </div>
+      )}
     </div>
   );
 }

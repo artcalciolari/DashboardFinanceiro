@@ -1,4 +1,4 @@
-﻿import { EventEmitter } from 'node:events';
+import { EventEmitter } from 'node:events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { createPrismaMock } from './helpers/prismaMock';
@@ -10,6 +10,7 @@ vi.mock('../src/services/subscriptionService', () => ({
   ensureSubscriptionTransactions: vi.fn().mockResolvedValue(undefined),
   getSubscriptionHorizon: vi.fn(() => new Date(2027, 7, 31, 23, 59, 59)),
   resetSubscriptionTransactionHorizon: vi.fn(),
+  synchronizeSubscriptionTransactions: vi.fn().mockResolvedValue(undefined),
 }));
 
 function tx(overrides: Record<string, unknown> = {}) {

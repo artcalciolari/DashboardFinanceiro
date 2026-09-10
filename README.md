@@ -35,7 +35,8 @@ git clone https://github.com/artcalciolari/DashboardFinanceiro.git
 cd DashboardFinanceiro
 
 cp .env.example .env
-# Edite o .env com valores locais antes de subir os serviços.
+# Edite DB_* e configure DASHBOARD_AUTH_USER e DASHBOARD_AUTH_PASSWORD
+# (senha exclusiva com pelo menos 16 caracteres).
 
 docker compose up -d
 ```
@@ -81,9 +82,15 @@ atrás de um proxy TLS externo, use o override remoto (porta 80 no host):
 docker compose -f docker-compose.yml -f docker-compose.remote.yml up -d
 ```
 
-Configure `DASHBOARD_BIND_ADDRESS` no `.env` (por exemplo `0.0.0.0`) e restrinja
-a porta no firewall. Não há login na aplicação — proteja o acesso na rede ou no
-proxy, se necessário.
+Configure `DASHBOARD_BIND_ADDRESS` no `.env` e restrinja a porta no firewall.
+A API exige autenticação HTTP Basic em produção: o navegador solicita o usuário
+e a senha definidos em `DASHBOARD_AUTH_USER` e `DASHBOARD_AUTH_PASSWORD`.
+Use HTTPS no proxy para qualquer acesso remoto; autenticação Basic depende do
+TLS para proteger as credenciais em trânsito. O proxy deve sobrescrever
+`X-Forwarded-Proto` e restringir o acesso direto à porta interna.
+Sem credenciais válidas o backend recusa inicialização em produção. Em desenvolvimento,
+sem ambas as variáveis, acesso local continua disponível sem autenticação.
+As rotas de saúde não expõem dados financeiros e permanecem públicas na rede interna.
 
 ## Deploy automatizado
 
@@ -99,13 +106,65 @@ Antes do primeiro deploy, o servidor precisa ter:
 - `/home/arthur/dashboard-financeiro/.env`;
 - stack atual com o banco `financeiro_db` disponível.
 
-Cada execução cria e valida um backup custom-format em
-`/home/arthur/dashboard-financeiro/backups`, executa o preflight, compila as
-imagens antes da parada, aplica migrações com Prisma, compara contagens de linhas
+Cada execução executa o preflight e compila as imagens antes da parada.
+Após interromper as escritas, cria um backup custom-format em
+`/home/arthur/dashboard-financeiro/backups` e o restaura em um banco temporário
+para verificar sua integridade. Aplica migrações com Prisma, compara contagens de linhas
 e verifica a prontidão da API. Se a migração falhar, os containers antigos são
 reiniciados. Se uma falha ocorrer depois da migração, restaure o backup antes de
 voltar para imagens antigas, pois colunas renomeadas não são compatíveis com o
 backend anterior.
+
+### Backup periódico e cópia externa
+
+`deploy/backup.sh` cria e restaura um backup de teste a cada execução. Precisa
+de espaço para uma cópia adicional do banco e permissão para criar/remover bancos
+temporários. A restauração de verificação nunca substitui o banco original.
+
+Configure no `.env` de produção:
+
+```dotenv
+BACKUP_RETENTION_DAYS=30
+BACKUP_OFFSITE_DEST=backup-user@backup-host:/srv/backups/dashboard-financeiro/
+```
+
+Prepare a chave SSH e o host conhecido para o usuário do serviço. O destino deve
+ser outro servidor, com acesso restrito. Sem `BACKUP_OFFSITE_DEST`, somente a cópia
+local será criada. A retenção de 30 dias aplica-se às cópias locais; configure
+a retenção do destino remoto separadamente. Falhas de transferência fazem o job falhar.
+
+Para instalar o agendamento diário no servidor Linux:
+
+```bash
+sudo cp deploy/dashboard-backup.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now dashboard-backup.timer
+sudo systemctl start dashboard-backup.service
+sudo journalctl -u dashboard-backup.service -n 30
+```
+
+O serviço usa `/home/arthur/dashboard-financeiro/.env` e roda como `arthur`.
+A inclusão dos arquivos no repositório não instala o serviço no servidor.
+
+### Pagamentos e reembolsos
+
+Vencimento e pagamento são independentes. `paidAt` registra a baixa real;
+registros anteriores à migração permanecem sem baixa até confirmação do usuário.
+`PATCH /api/transactions/:id/settlement` recebe `{ "paidAt": "ISO-8601" }`;
+use `null` para estornar. Datas futuras são rejeitadas.
+
+`PATCH /api/transactions/:id/reimbursement` recebe o **total já recebido**, em
+`reimbursedAmountCents`, e a data em `reimbursedAt`. O valor deve ficar entre zero
+e o valor da despesa. Zero e data nula estornam o reembolso. A operação é idempotente
+e aceita ocorrências de assinaturas e parcelamentos, sem liberar a edição de sua origem.
+Reembolsos integrais antigos são preservados com data desconhecida (`null`).
+Ocorrências pagas ou reembolsadas não são apagadas pelo cancelamento de parcelas
+futuras nem recalculadas por edições da assinatura. A exclusão explícita de todo o
+histórico continua disponível e destrutiva.
+
+Edições de conta e recálculos são atômicos. Categorias em uso não podem mudar de
+tipo; a restrição também é validada pelo PostgreSQL. Conflitos de transações
+serializáveis são repetidos de forma limitada antes de retornar erro.
 
 ## Migrações de dados
 

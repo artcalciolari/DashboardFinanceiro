@@ -1,4 +1,4 @@
-﻿import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { createPrismaMock } from './helpers/prismaMock';
 
@@ -9,6 +9,7 @@ vi.mock('../src/services/subscriptionService', () => ({
   ensureSubscriptionTransactions: vi.fn().mockResolvedValue(undefined),
   getSubscriptionHorizon: vi.fn(() => new Date(2027, 7, 31, 23, 59, 59)),
   resetSubscriptionTransactionHorizon: vi.fn(),
+  synchronizeSubscriptionTransactions: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('subscriptions and export API', () => {
@@ -90,7 +91,7 @@ describe('subscriptions and export API', () => {
       isReimbursed: false,
       notes: null,
     });
-    prisma.$transaction.mockResolvedValue([{ id: 's1', name: 'Updated' }]);
+    prisma.subscription.update.mockResolvedValue({ id: 's1', name: 'Updated' });
     expect(
       (await request(app).patch('/api/subscriptions/s1').send({ name: 'Updated' })).status
     ).toBe(200);

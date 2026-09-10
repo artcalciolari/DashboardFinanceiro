@@ -73,9 +73,18 @@ export interface Transaction {
   isThirdParty: boolean;
   thirdPartyName?: string | null;
   isReimbursed: boolean;
+  paidAt?: string | null;
+  reimbursedAmountCents?: number;
+  reimbursedAt?: string | null;
   notes?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface InstallmentAggregates {
+  activeCount: number;
+  remainingAmountCents: number;
+  committedMonthlyCents?: number;
 }
 
 export interface InstallmentGroup {
@@ -99,6 +108,7 @@ export interface InstallmentGroup {
   historicalCount?: number;
   deletableFutureCount?: number;
   remainingAmountCents?: number;
+  overdueCount?: number;
   installmentAmountCents?: number;
   firstTransaction?: Transaction | null;
   nextTransaction?: Transaction | null;

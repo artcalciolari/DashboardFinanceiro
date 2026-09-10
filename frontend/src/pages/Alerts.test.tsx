@@ -34,6 +34,16 @@ describe('Alerts', () => {
     remove.mockReset().mockResolvedValue({});
   });
 
+  it('shows alert load error and retries', async () => {
+    const user = userEvent.setup();
+    getAll.mockRejectedValueOnce(new Error('offline')).mockResolvedValue([]);
+    check.mockResolvedValue([]);
+    renderWithProviders(<Alerts />);
+    await waitFor(() => expect(screen.getByText('Não foi possível carregar os alertas')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    await waitFor(() => expect(getAll).toHaveBeenCalledTimes(2));
+  });
+
   it('empty state and create', async () => {
     const user = userEvent.setup();
     getAll.mockResolvedValue([]);
@@ -126,5 +136,14 @@ describe('Alerts', () => {
     expect(screen.getByText('Excluir alerta')).toBeInTheDocument();
     resolveDelete();
     await waitFor(() => expect(screen.queryByText(/Excluir "/)).not.toBeInTheDocument());
+  });
+
+  it('shows cached alerts warning when refresh fails', async () => {
+    getAll.mockResolvedValueOnce([mockAlert]).mockRejectedValueOnce(new Error('down'));
+    check.mockResolvedValue([mockAlertStatus]);
+    const { queryClient } = renderWithProviders(<Alerts />);
+    await waitFor(() => expect(screen.getByText('Limite alimentação')).toBeInTheDocument());
+    await queryClient.invalidateQueries({ queryKey: ['alerts'] });
+    await waitFor(() => expect(screen.getByText(/Exibindo dados salvos/)).toBeInTheDocument());
   });
 });

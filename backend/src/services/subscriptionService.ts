@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { calculateEffectiveDate } from '../utils/creditCard';
 import { mutablePeriodStart } from '../utils/businessTime';
+import { financialTransaction } from './financialTransaction';
 
 // Serialising avoids redundant work inside one process. Database uniqueness and
 // createMany(skipDuplicates) provide correctness across multiple instances.
@@ -46,7 +47,7 @@ export function ensureSubscriptionTransactions(untilDate: Date) {
   const task = synchronizationQueue.then(async () => {
     if (synchronizedThrough && requestedThrough <= synchronizedThrough) return;
 
-    await synchronizeSubscriptionTransactions(requestedThrough);
+    await financialTransaction((tx) => synchronizeSubscriptionTransactions(requestedThrough, tx));
     synchronizedThrough = requestedThrough;
   });
 
@@ -56,19 +57,21 @@ export function ensureSubscriptionTransactions(untilDate: Date) {
   return task;
 }
 
-async function synchronizeSubscriptionTransactions(untilDate: Date) {
+export async function synchronizeSubscriptionTransactions(untilDate: Date, db: Prisma.TransactionClient = prisma, accountId?: string, subscriptionId?: string) {
   const mutableFrom = mutablePeriodStart();
-  const subscriptions = await prisma.subscription.findMany({
+  const subscriptions = await db.subscription.findMany({
     where: {
       isActive: true,
       startDate: { lte: untilDate },
+      ...(accountId && { accountId }),
+      ...(subscriptionId && { id: subscriptionId }),
     },
     include: { account: true },
   });
 
   if (subscriptions.length === 0) return;
 
-  const existingTransactions = await prisma.transaction.findMany({
+  const existingTransactions = await db.transaction.findMany({
     where: {
       subscriptionId: { in: subscriptions.map((subscription) => subscription.id) },
       subscriptionYear: { not: null },
@@ -88,6 +91,8 @@ async function synchronizeSubscriptionTransactions(untilDate: Date) {
       isThirdParty: true,
       thirdPartyName: true,
       isReimbursed: true,
+      paidAt: true,
+      reimbursedAmountCents: true,
       notes: true,
     },
   });
@@ -141,7 +146,7 @@ async function synchronizeSubscriptionTransactions(untilDate: Date) {
         if (existingTransaction) {
           // A subscription edit should never silently rewrite an already closed
           // month. Future/current occurrences are still recalculated below.
-          if (existingTransaction.effectiveDate < mutableFrom) {
+          if (existingTransaction.effectiveDate < mutableFrom || effectiveDate < mutableFrom || existingTransaction.paidAt || existingTransaction.reimbursedAmountCents > 0) {
             cursor = addMonths(cursor, 1);
             continue;
           }
@@ -168,13 +173,10 @@ async function synchronizeSubscriptionTransactions(untilDate: Date) {
           if (existingTransaction.effectiveDate.getTime() !== effectiveDate.getTime()) {
             updateData.effectiveDate = effectiveDate;
           }
-          if (existingTransaction.isReimbursed !== expectedIsReimbursed) {
-            updateData.isReimbursed = expectedIsReimbursed;
-          }
 
           if (Object.keys(updateData).length > 0) {
             transactionUpdates.push(
-              prisma.transaction.update({
+              db.transaction.update({
                 where: { id: existingTransaction.id },
                 data: updateData,
               })
@@ -199,6 +201,8 @@ async function synchronizeSubscriptionTransactions(untilDate: Date) {
           isThirdParty: subscription.isThirdParty,
           thirdPartyName: subscription.isThirdParty ? subscription.thirdPartyName : null,
           isReimbursed: expectedIsReimbursed,
+          reimbursedAmountCents: expectedIsReimbursed ? subscription.amountCents : 0,
+          reimbursedAt: expectedIsReimbursed ? new Date() : null,
           notes: subscription.notes,
         });
       }
@@ -213,7 +217,7 @@ async function synchronizeSubscriptionTransactions(untilDate: Date) {
 
   if (transactionsData.length > 0) {
     writeOperations.push(
-      prisma.transaction.createMany({
+      db.transaction.createMany({
         data: transactionsData,
         skipDuplicates: true,
       })
@@ -222,5 +226,6 @@ async function synchronizeSubscriptionTransactions(untilDate: Date) {
 
   if (writeOperations.length === 0) return;
 
-  await prisma.$transaction(writeOperations);
+  if (db === prisma) await prisma.$transaction(writeOperations);
+  else await Promise.all(writeOperations);
 }

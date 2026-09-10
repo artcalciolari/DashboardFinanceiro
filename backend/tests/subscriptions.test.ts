@@ -1,4 +1,4 @@
-﻿import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { createPrismaMock } from './helpers/prismaMock';
 
@@ -9,6 +9,7 @@ vi.mock('../src/services/subscriptionService', () => ({
   ensureSubscriptionTransactions: vi.fn().mockResolvedValue(undefined),
   getSubscriptionHorizon: vi.fn(() => new Date(2026, 7, 31, 23, 59, 59)),
   resetSubscriptionTransactionHorizon: vi.fn(),
+  synchronizeSubscriptionTransactions: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('subscriptions API', () => {
@@ -87,7 +88,7 @@ describe('subscriptions API', () => {
       });
     expect(created.status).toBe(201);
     expect(resetSubscriptionTransactionHorizon).toHaveBeenCalled();
-    expect(ensureSubscriptionTransactions).toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalled();
 
     expect(
       (
@@ -156,7 +157,7 @@ describe('subscriptions API', () => {
       isReimbursed: false,
       notes: 'keep',
     });
-    prisma.$transaction.mockResolvedValue([{ id: 's1', endDate: new Date('2026-12-01') }]);
+    prisma.subscription.update.mockResolvedValue({ id: 's1', endDate: new Date('2026-12-01') });
     expect(
       (await request(app).put('/api/subscriptions/s1').send({ isActive: false })).status
     ).toBe(200);
